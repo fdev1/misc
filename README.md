@@ -1,4 +1,5 @@
 misc
 ====
 
-Miscellaneous
+Collections of miscellaneous scripts and files.
+
