@@ -1,0 +1,2 @@
+kbdrate -d 300 > /dev/null
+

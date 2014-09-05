@@ -1,0 +1,28 @@
+#!/bin/sh
+
+quiet=0
+splash=0
+
+# parse the command line
+#
+for arg in $(cat /proc/cmdline);
+do
+	case $arg in
+
+		quiet)
+			quiet=1
+		;;
+		splash)
+			splash=1
+		;;
+	esac
+done
+
+# start the splash helper in the background
+# it will kill the splash screen in a few seconds
+#
+if [ $splash == 1 ] && [ $quiet == 1 ]; then
+	/etc/local.d/splash.helper &
+fi
+
+

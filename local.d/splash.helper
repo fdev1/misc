@@ -1,0 +1,7 @@
+#!/bin/sh
+
+#
+# wait 5 seconds before killing plymouth
+#
+sleep 10
+plymouth --quit

@@ -1,0 +1,5 @@
+#
+# disable bluetooth adapter on startup
+#
+#rmmod radeon
+#rfkill block 1
