@@ -3,6 +3,7 @@
 source_dir=/usr/share/initramfs
 output_dir=$source_dir/ramfs
 last_error=0
+copy_firmware=0
 
 error_check()
 {
@@ -12,13 +13,26 @@ error_check()
 	fi
 }
 
+while [ $# != 0 ];
+do
+
+	case $1 in
+
+		--copy-firmware)
+			copy_firmware=1
+		;;
+	esac
+done
+
 
 #
 # clean output directories
 #
-echo 'Cleaning up...'
-rm -r $output_dir || last_error=1
-error_check
+if [ -d $output_dir ]; then
+	echo 'Cleaning up...'
+	rm -r $output_dir || last_error=1
+	error_check
+fi
 
 #
 # make directories
@@ -139,18 +153,20 @@ error_check
 #
 # copy usb firmware
 #
-echo 'Copying USB firmware...'
-mkdir -p $output_dir/lib64/firmware || last_error=1
-cp -r /lib/firmware/ar3k $output_dir/lib/firmware/ || last_error=1
-error_check
+if [ $copy_firmware == 1 ]; then
+	echo 'Copying USB firmware...'
+	mkdir -p $output_dir/lib64/firmware || last_error=1
+	cp -r /lib/firmware/ar3k $output_dir/lib/firmware/ || last_error=1
+	error_check
 
-#echo 'Copying modules...'
-mkdir -p $output_dir/lib/modules/3.16.1/kernel/drivers/char/drm/
-mkdir -p $output_dir/lib/modules/3.16.1/kernel/drivers/gpu/drm/
-cp /lib/modules/3.16.1/kernel/drivers/char/drm/fglrx.ko $output_dir/lib/modules/3.16.1/kernel/drivers/char/drm
-#cp /lib/modules/3.16.1/kernel/drivers/gpu/drm/drm_kms_helper.ko $output_dir/lib/modules/3.16.1/kernel/drivers/gpu/drm
-#cp -r /lib/modules/3.16.1/kernel/drivers/gpu/drm/ttm $output_dir/lib/modules/3.16.1/kernel/drivers/gpu/drm
-error_check
+	#echo 'Copying modules...'
+	mkdir -p $output_dir/lib/modules/3.16.1/kernel/drivers/char/drm/
+	mkdir -p $output_dir/lib/modules/3.16.1/kernel/drivers/gpu/drm/
+	cp /lib/modules/3.16.1/kernel/drivers/char/drm/fglrx.ko $output_dir/lib/modules/3.16.1/kernel/drivers/char/drm
+	#cp /lib/modules/3.16.1/kernel/drivers/gpu/drm/drm_kms_helper.ko $output_dir/lib/modules/3.16.1/kernel/drivers/gpu/drm
+	#cp -r /lib/modules/3.16.1/kernel/drivers/gpu/drm/ttm $output_dir/lib/modules/3.16.1/kernel/drivers/gpu/drm
+	error_check
+fi
 
 #
 # copy resume
@@ -207,7 +223,7 @@ exec >/dev/console </dev/console 2>&1
 #
 PATH="${PATH}:/sbin:/usr/sbin"
 
-FAKE_ROOT=""
+fake_root=""
 quiet=0
 debug=0
 show_splash=0
@@ -243,7 +259,7 @@ error_check
 for x in $(cat /proc/cmdline); do
 	case "${x}" in
         	root=*)
-			FAKE_ROOT=${x#*=}
+			fake_root=${x#*=}
         	;;
 		init_opts=*)
 			init_opts=${x#*=}
@@ -270,7 +286,7 @@ fi
 
 # mount the new root filesystem
 #
-mount /dev/sda6 /newroot
+mount $fake_root /newroot
 
 # inform plymouth of new root
 #
