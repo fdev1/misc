@@ -1,0 +1,67 @@
+#!/bin/sh
+#
+# is_part_aligned
+# Copyright 2014 - Fernando Rodriguez (frodriguez.developer@outlook.com)
+#
+# Determines if your partitions are optimally aligned.
+#
+
+cmd=""
+part_no=1
+sector_alignment=8
+device_path=""
+device_name=$(echo $1 | sed 's|/dev/||')
+sector_boundary=0
+
+while [ $# != 0 ];
+do
+	case $1 in
+		--gpt) cmd=gdisk;;
+		--mbr) cmd=fdisk;;
+		--help)
+			echo -e 'is_part_aligned v0.1'
+			echo -e 'Copyright 2014 - Fernando Rodriguez (frodriguez.developer@outlook.com)'
+			echo -e 'Usage: is_part_aligned [options] device_path'
+			echo
+			echo -e 'Options:'
+			echo -e '\t--mbr\tAssume device is mbr'
+			echo -e '\t--gpt\tAssume device is gtp'
+			echo
+			exit
+		;;
+		*) device_path=$1;;
+	esac
+	shift
+done
+
+part_type=$(fdisk -l $device_path | grep 'Disklabel type: ' | sed 's/Disklabel type: //')
+
+if [ "$cmd" == "" ]; then
+	case $part_type in
+		gpt) cmd=gdisk;;
+		*) cmd=fdisk;;
+	esac
+fi
+
+logical_sector=/sys/block/$device_name/queue/logical_block_size
+physical_sector=/sys/block/$device_name/queue/physical_block_size
+logical_sector=$(cat $logical_sector)
+physical_sector=$(cat $physical_sector)
+sector_boundary=$((physical_sector / logical_sector))
+
+echo 'Disk type:' $part_type
+echo 'Logical sector size:' $logical_sector
+echo 'Physical sector size:' $physical_sector
+echo 'Sector boundary:' $sector_boundary
+echo
+
+
+for part_size in $($cmd -l /dev/sda | sed 's/^ *//'| tail -n+19 | tr -s ' ' | cut -d' ' -f2); 
+do
+	if [ $(echo $part_size '%' $sector_boundary | bc) != 0 ]; then
+		echo '[!!] Partition #'$part_no' ('$part_size') is misaligned! ***'
+	else
+		echo '[--] Partition #'$part_no' ('$part_size') is aligned.'
+	fi
+	part_no=$((part_no + 1));
+done
