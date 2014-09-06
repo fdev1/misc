@@ -1,11 +1,32 @@
 #!/bin/sh
+#
+# mkinitramfs script
+# Copyright 2014 - Fernando Rodriguez
+# Author: Fernando Rodriguez (frodriguez.developer@outlook.com)
+#
+# This program is free software; you can redistribute it and/or modify
+# it under the terms of the GNU General Public License Version 3 as
+# published by the Free Software Foundation.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program; if not, write to the Free Software
+# Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
+#
+
 
 current_dir=$(pwd)
 source_dir=/var/tmp/mkinitramfs
 output_dir=$source_dir/ramfs
 last_error=0
 copy_firmware=0
-compress=1
+#compress=1
+overlay=""
+compress_method="xz"
 
 # error checking routine
 #
@@ -28,7 +49,27 @@ do
 			copy_firmware=1
 		;;
 		--no-compress)
-			compress=0
+			#compress=0
+			compress_method=""
+		;;
+		--compress=*)
+			compress_method=${1#*=}
+		;;
+		--overlay=*)
+			overlay=${1#*=}
+		;;
+		--help|-h)
+
+			echo -e 'mkinitramfs v0.1'
+			echo -e 'Copyright 2014 - Fernando Rodriguez (frodriguez.developer@outlook.com)'
+			echo -e 'Usage: mkinitramfs [options]'
+			echo
+			echo -e 'Options:'
+			echo -e "\t--no-compress\t\tDon't compress archive"
+			echo -e "\t--compress=method\tSets the compression method (gzip,xz)"
+			echo -e "\t--overlay=dir\t\tSets overlay directory"
+			echo
+			exit
 		;;
 	esac
 	shift
@@ -40,8 +81,6 @@ if [ -d $source_dir ]; then
 	rm -r $source_dir
 fi
 
-
-#
 # clean output directories
 #
 #if [ -d $output_dir ]; then
@@ -50,7 +89,6 @@ fi
 #	error_check
 #fi
 
-#
 # make directories
 #
 echo 'Creating directory tree...'
@@ -151,7 +189,6 @@ cp -r /usr/share/plymouth/themes/text $output_dir/usr/share/plymouth/themes
 cp -r /usr/share/plymouth/themes/details $output_dir/usr/share/plymouth/themes
 error_check
 
-#
 # Copy plymouth theme
 #
 ply_theme=$(plymouth-set-default-theme)
@@ -159,7 +196,7 @@ ply_theme_file=/usr/share/plymouth/themes/$ply_theme/$ply_theme.plymouth
 ply_plugins=$(plymouth --get-splash-plugin-path)
 
 [ -z "$ply_theme" ] && plymouth_theme=text
-echo 'Copying plymouth theme: '$ply_theme
+echo 'Copying plymouth theme: '$ply_theme'...'
 cp -r /usr/share/plymouth/themes/$ply_theme $output_dir/usr/share/plymouth/themes
 cp -r $ply_plugins$(grep "^ModuleName=" $ply_theme_file | cut -d= -f2-).so $output_dir$ply_plugins
 ln -s $ply_theme/$ply_theme.plymouth $output_dir/usr/share/plymouth/themes/default.plymouth
@@ -184,15 +221,21 @@ if [ $copy_firmware == 1 ]; then
 	error_check
 fi
 
-#
 # copy resume
 #
 echo 'Copying uswsusp resume...'
-cp /usr/lib/suspend/resume $output_dir/sbin
-cp /etc/suspend.conf $output_dir/etc
+cp /usr/lib/suspend/resume $output_dir/sbin || last_error=1
+cp /etc/suspend.conf $output_dir/etc || last_error=1
 error_check
 
+# copy overlay
 #
+if [ "$overlay" != "" ]; then
+	echo 'Copying overlay...'
+	cp -r $overlay/* $output_dir || last_error=1
+	error_check
+fi
+
 # ld.so.conf
 #
 echo 'Generating ld.so.cache...'
@@ -200,7 +243,6 @@ echo '/lib' >  $output_dir/etc/ld.so.conf
 echo '/usr/lib' >> $output_dir/etc/ld.so.conf
 ldconfig -r $output_dir
 
-#
 # copy init script
 #
 echo 'Copying init script...'
@@ -297,6 +339,12 @@ if [ $show_splash == 1 ] && [ $quiet == 1 ]; then
 	plymouth --show-splash
 fi
 
+# if there's a linuxrc script execute it now
+#
+if [ -x /linuxrc ]; then
+	exec sh /linuxrc
+fi
+
 # mount the new root filesystem
 #
 mount $fake_root /newroot
@@ -324,14 +372,20 @@ if [ $show_splash == 1 ] && [ $quiet == 1 ]; then
 	plymouth --hide-splash
 fi
 
+# if the debug option was specified then attempt to
+# start a shell, otherwise just display an error message
+#
 if [ $debug == 1 ]; then
 	echo 'Init process did not start correctly'
 	echo 'Attempting to start a shell...'
-	/bin/sh
+	exec /bin/sh
 else
 	echo 'Init process did not start correctly'
 fi
 
+# display an error notifying use that he can press
+# CTRL-ALT-DEL to reboot the system and hang the system
+#
 echo 'Press CTRL-ALT-DEL to reboot.'
 
 while [ 1 ];
@@ -346,7 +400,6 @@ EOF
 chmod +x $output_dir/init || last_error=1
 error_check
 
-#
 # create cpio archive
 #
 echo 'Creating cpio archive...'
@@ -354,24 +407,45 @@ cd $output_dir
 find . -print0 | cpio --null -o --format=newc > $source_dir/initramfs.cpio || last_error=1
 error_check
 
-#
 # compress the archive
 #
-if [ $compress == 1 ]; then
-	echo 'Compresing archive...'
-	cat $source_dir/initramfs.cpio | gzip -9 > $source_dir/initramfs.img || last_error=1
-	#cat $source_dir/initramfs.cpio | xz > $source_dir/initramfs.img || last_error=1
-	error_check
+#if [ $compress == 1 ]; then
+#	echo 'Compresing archive...'
+#	#cat $source_dir/initramfs.cpio | gzip -9 > $source_dir/initramfs.img || last_error=1
+#	cat $source_dir/initramfs.cpio | xz -e --check=none -z -f -9 > $source_dir/initramfs.img || last_error=1
+#	error_check
+#fi
+
+if [ "$compress_method" != "" ]; then
+
+	echo 'Compressing archive ('$compress_method')...'
+
+	case $compress_method in
+		gzip)
+			cat $source_dir/initramfs.cpio | gzip -9 > $source_dir/initramfs.img || last_error=1
+		;;
+		xz)
+			cat $source_dir/initramfs.cpio | xz -e --check=none -z -f -9 > $source_dir/initramfs.img || last_error=1
+		;;
+		*)
+			echo 'error: Compression method not supported!'
+			exit
+		;;
+	esac
 fi
+
 
 # copy image to output dir and delete temp dir
 #
-if [ $compress == 1 ]; then
+if [ "$compress_method" != "" ]; then
 	cp $source_dir/initramfs.img $current_dir || last_error=1
 else
 	cp $source_dir/initramfs.cpio $current_dir/initramfs.img || last_error=1
 fi
 
+# remove tmp files
+#
+echo 'Cleaning up...'
 rm -r $source_dir || last_error=1
 error_check
 
