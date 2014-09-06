@@ -97,8 +97,8 @@ mkdir -p $output_dir/sbin || last_error=1
 mkdir -p $output_dir/etc || last_error=1
 mkdir -p $output_dir/usr/bin || last_error=1
 mkdir -p $output_dir/usr/sbin || last_error=1
-mkdir -p $output_dir/usr/lib64 || last_error=1
-mkdir -p $output_dir/lib64 || last_error=1
+mkdir -p $output_dir/usr/lib || last_error=1
+mkdir -p $output_dir/lib || last_error=1
 mkdir -p $output_dir/dev || last_error=1
 mkdir -p $output_dir/dev/shm || last_error=1
 mkdir -p $output_dir/proc || last_error=1
@@ -111,8 +111,6 @@ mkdir -p $output_dir/newroot/run
 mkdir -p $output_dir/newroot/dev
 mkdir -p $output_dir/newroot/sys
 mkdir -p $output_dir/newroot/proc
-ln -s lib64 $output_dir/lib || last_error=1
-ln -s lib64 $output_dir/usr/lib || last_error=1
 
 #cd $output_dir/dev || last_error=1
 mknod -m 660 $output_dir/dev/console c 5 1 || last_error=1
@@ -122,6 +120,12 @@ mknod -m 600 $output_dir/dev/tty0 c 4 0 || last_error=1
 mknod -m 600 $output_dir/dev/tty1 c 4 1 || last_error=1
 mknod -m 600 $output_dir/dev/ttyS0 c 4 64 || last_error=1
 chmod 1777 $output_dir/dev/shm || last_error=1
+error_check
+
+# create lib64 symlinks
+#
+ln -s lib $output_dir/lib64 || last_error=1
+ln -s lib $output_dir/usr/lib64 || last_error=1
 error_check
 
 #
@@ -163,12 +167,12 @@ cp /usr/lib/libpng16.so.16 $output_dir/usr/lib
 cp /usr/lib/libkms.so.1 $output_dir/usr/lib
 cp /usr/lib/libdrm.so.2 $output_dir/usr/lib
 
-cp /lib/libc.so.6 $output_dir/lib64
-cp /lib/librt.so.1 $output_dir/lib64
-cp /lib/libdl.so.2 $output_dir/lib64
-cp /lib/libm.so.6 $output_dir/lib64
-cp /lib/ld-linux-x86-64.so.2 $output_dir/lib64
-cp /lib/libpthread.so.0 $output_dir/lib64
+cp /lib/libc.so.6 $output_dir/lib
+cp /lib/librt.so.1 $output_dir/lib
+cp /lib/libdl.so.2 $output_dir/lib
+cp /lib/libm.so.6 $output_dir/lib
+cp /lib/ld-linux-x86-64.so.2 $output_dir/lib
+cp /lib/libpthread.so.0 $output_dir/lib
 cp /lib/libkmod.so.2 $output_dir/lib
 cp /lib/libz.so.1 $output_dir/lib
 
@@ -208,7 +212,7 @@ error_check
 #
 if [ $copy_firmware == 1 ]; then
 	echo 'Copying USB firmware...'
-	mkdir -p $output_dir/lib64/firmware || last_error=1
+	mkdir -p $output_dir/lib/firmware || last_error=1
 	cp -r /lib/firmware/ar3k $output_dir/lib/firmware/ || last_error=1
 	error_check
 
