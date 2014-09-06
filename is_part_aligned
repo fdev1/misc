@@ -5,6 +5,18 @@
 #
 # Determines if your partitions are optimally aligned.
 #
+# This program is free software; you can redistribute it and/or modify
+# it under the terms of the GNU General Public License Version 3 as
+# published by the Free Software Foundation.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program; if not, write to the Free Software
+# Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
 
 cmd=""
 part_no=1
@@ -16,8 +28,14 @@ sector_boundary=0
 while [ $# != 0 ];
 do
 	case $1 in
-		--gpt) cmd=gdisk;;
-		--mbr) cmd=fdisk;;
+		--gpt) 
+			cmd=gdisk
+			tail_lines=19
+		;;
+		--mbr) 
+			cmd=fdisk
+			tail_lines=10
+		;;
 		--help)
 			echo -e 'is_part_aligned v0.1'
 			echo -e 'Copyright 2014 - Fernando Rodriguez (frodriguez.developer@outlook.com)'
