@@ -1,10 +1,14 @@
 #!/bin/sh
 
-source_dir=/usr/share/initramfs
+current_dir=$(pwd)
+source_dir=/var/tmp/mkinitramfs
 output_dir=$source_dir/ramfs
 last_error=0
 copy_firmware=0
+compress=1
 
+# error checking routine
+#
 error_check()
 {
 	if [ $last_error == 1 ]; then
@@ -13,6 +17,8 @@ error_check()
 	fi
 }
 
+# parse command line
+#
 while [ $# != 0 ];
 do
 
@@ -21,18 +27,28 @@ do
 		--copy-firmware)
 			copy_firmware=1
 		;;
+		--no-compress)
+			compress=0
+		;;
 	esac
+	shift
 done
+
+# if the tmp directory exists delete it
+#
+if [ -d $source_dir ]; then
+	rm -r $source_dir
+fi
 
 
 #
 # clean output directories
 #
-if [ -d $output_dir ]; then
-	echo 'Cleaning up...'
-	rm -r $output_dir || last_error=1
-	error_check
-fi
+#if [ -d $output_dir ]; then
+#	echo 'Cleaning up...'
+#	rm -r $output_dir || last_error=1
+#	error_check
+#fi
 
 #
 # make directories
@@ -60,7 +76,7 @@ mkdir -p $output_dir/newroot/proc
 ln -s lib64 $output_dir/lib || last_error=1
 ln -s lib64 $output_dir/usr/lib || last_error=1
 
-cd $output_dir/dev || last_error=1
+#cd $output_dir/dev || last_error=1
 mknod -m 660 $output_dir/dev/console c 5 1 || last_error=1
 mknod -m 660 $output_dir/dev/null c 1 3 || last_error=1
 mknod -m 660 $output_dir/dev/zero c 1 5 || last_error=1
@@ -187,10 +203,7 @@ ldconfig -r $output_dir
 #
 # copy init script
 #
-echo 'Copying linuxrc...'
-#cp $source_dir/linuxrc $output_dir/init || last_error=1
-#error_check
-
+echo 'Copying init script...'
 
 #########################################
 # begin init script
@@ -341,9 +354,24 @@ cd $output_dir
 find . -print0 | cpio --null -o --format=newc > $source_dir/initramfs.cpio || last_error=1
 error_check
 
-echo 'Compresing archive...'
-cat $source_dir/initramfs.cpio | gzip -9 > $source_dir/initramfs.img || last_error=1
-#cat $source_dir/initramfs.cpio | xz > $source_dir/initramfs.img || last_error=1
-error_check
+#
+# compress the archive
+#
+if [ $compress == 1 ]; then
+	echo 'Compresing archive...'
+	cat $source_dir/initramfs.cpio | gzip -9 > $source_dir/initramfs.img || last_error=1
+	#cat $source_dir/initramfs.cpio | xz > $source_dir/initramfs.img || last_error=1
+	error_check
+fi
 
+# copy image to output dir and delete temp dir
+#
+if [ $compress == 1 ]; then
+	cp $source_dir/initramfs.img $current_dir || last_error=1
+else
+	cp $source_dir/initramfs.cpio $current_dir/initramfs.img || last_error=1
+fi
+
+rm -r $source_dir || last_error=1
+error_check
 
