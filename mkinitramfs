@@ -144,6 +144,7 @@ ln -s busybox $output_dir/bin/cat || last_error=1
 ln -s busybox $output_dir/bin/mount || last_error=1
 ln -s busybox $output_dir/bin/sh || last_error=1
 ln -s busybox $output_dir/bin/echo || last_error=1
+ln -s busybox $output_dir/bin/sleep || last_error=1
 ln -s /bin/busybox $output_dir/sbin/switch_root || last_error=1
 error_check
 
@@ -311,7 +312,16 @@ error_check
 
 # invoke uswsusp resume
 #
-/sbin/resume
+/sbin/resume &
+resume_pid=$!
+sleep 1
+if [ "$(kill -0 $resume_pid 2>&1)" == "" ]; then
+	echo -en "\x1b[2K\rResuming...\n"
+	while [ "$(kill -0 $resume_pid 2>&1)" == "" ];
+	do
+		sleep 2
+	done
+fi
 
 # parse command line
 #
@@ -343,6 +353,8 @@ if [ $show_splash == 1 ] && [ $quiet == 1 ]; then
 	plymouth --show-splash
 fi
 
+#/sbin/resume
+
 # if there's a linuxrc script execute it now
 #
 if [ -x /linuxrc ]; then
@@ -351,7 +363,7 @@ fi
 
 # mount the new root filesystem
 #
-mount $fake_root /newroot
+mount -o ro $fake_root /newroot
 
 # inform plymouth of new root
 #
