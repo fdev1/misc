@@ -1,0 +1,3 @@
+#!/bin/bash
+
+unison-2.40 -ui text -auto -perms 0 -fat -unicode utf8 ~/Music ssh://workstation//mnt/d/Music
