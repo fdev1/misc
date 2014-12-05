@@ -26,6 +26,10 @@ last_error=0
 copy_firmware=0
 #compress=1
 overlay=""
+pango_support=1
+plymouth_support=1
+uswsusp_support=1
+swsusp_support=1
 compress_method="xz"
 
 # error checking routine
@@ -36,6 +40,17 @@ error_check()
 		echo 'An error has occurred!'
 		exit
 	fi
+}
+
+copy_links()
+{
+	#echo 'cp --preserve=links '$@
+	cp -r --preserve=links $@
+}
+
+display_msg()
+{
+	echo "$1"
 }
 
 # parse command line
@@ -58,6 +73,18 @@ do
 		--overlay=*)
 			overlay=${1#*=}
 		;;
+		--disable-pango)
+			pango_support=0
+		;;
+		--disable-plymouth)
+			plymouth_support=0
+		;;
+		--disable-swsusp)
+			swsusp_support=0
+		;;
+		--disable-uswsusp)
+			uswsusp_support=0
+		;;
 		--help|-h)
 
 			echo -e 'mkinitramfs v0.1'
@@ -68,6 +95,10 @@ do
 			echo -e "\t--no-compress\t\tDon't compress archive"
 			echo -e "\t--compress=method\tSets the compression method (gzip,xz)"
 			echo -e "\t--overlay=dir\t\tSets overlay directory"
+			echo -e "\t--disable-plymouth\t\tDisables plymouth support"
+			echo -e "\t--disable-pango\t\tDisables pango support for plymouth"
+			echo -e "\t--disable-swsusp\t\tDisables swsusp support"
+			echo -e "\t--disable-uswsusp\t\tDisables uswsusp kernel"
 			echo
 			exit
 		;;
@@ -91,7 +122,7 @@ fi
 
 # make directories
 #
-echo 'Creating directory tree...'
+display_msg 'Creating directory tree...'
 mkdir -p $output_dir/bin || last_error=1
 mkdir -p $output_dir/sbin || last_error=1
 mkdir -p $output_dir/etc || last_error=1
@@ -112,7 +143,6 @@ mkdir -p $output_dir/newroot/dev
 mkdir -p $output_dir/newroot/sys
 mkdir -p $output_dir/newroot/proc
 
-#cd $output_dir/dev || last_error=1
 mknod -m 660 $output_dir/dev/console c 5 1 || last_error=1
 mknod -m 660 $output_dir/dev/null c 1 3 || last_error=1
 mknod -m 660 $output_dir/dev/zero c 1 5 || last_error=1
@@ -138,7 +168,7 @@ echo "proc          /proc       proc    defaults    0 0" >> $output_dir/etc/fsta
 #
 # copy busybox files
 #
-echo 'Copying and installing busybox...'
+display_msg 'Copying and installing busybox...'
 cp /bin/busybox $output_dir/bin || last_error=1
 ln -s busybox $output_dir/bin/cat || last_error=1
 ln -s busybox $output_dir/bin/mount || last_error=1
@@ -148,109 +178,155 @@ ln -s busybox $output_dir/bin/sleep || last_error=1
 ln -s /bin/busybox $output_dir/sbin/switch_root || last_error=1
 error_check
 
-#
 # copy plymouth files
 #
-echo 'Copying plymouth files...'
-mkdir -p $output_dir/etc/plymouth || last_error=1
-mkdir -p $output_dir/usr/share/plymouth/themes || last_error=1
-mkdir -p $output_dir/usr/lib/plymouth/renderers || last_error=1
-cp /bin/plymouth $output_dir/bin/plymouth || last_error=1
-cp /sbin/plymouthd $output_dir/sbin/plymouthd || last_error=1
-cp -r /etc/plymouth/* $output_dir/etc/plymouth || last_error=1
-#cp -r /usr/share/plymouth/* $output_dir/usr/share/plymouth || last_error=1
+if [ $plymouth_support == 1 ]; then
 
-cp /usr/lib/libply.so.2 $output_dir/usr/lib
-cp /usr/lib/libply-splash-core.so.2 $output_dir/usr/lib
-cp /usr/lib/libply-splash-graphics.so.2 $output_dir/usr/lib
+	display_msg 'Copying plymouth files...'
+	mkdir -p $output_dir/etc/plymouth || last_error=1
+	mkdir -p $output_dir/usr/share/plymouth/themes || last_error=1
+	mkdir -p $output_dir/usr/lib/plymouth/renderers || last_error=1
+	cp /bin/plymouth $output_dir/bin/plymouth || last_error=1
+	cp /sbin/plymouthd $output_dir/sbin/plymouthd || last_error=1
+	cp -r /etc/plymouth/* $output_dir/etc/plymouth || last_error=1
 
-cp /usr/lib/libpng16.so.16 $output_dir/usr/lib
-cp /usr/lib/libkms.so.1 $output_dir/usr/lib
-cp /usr/lib/libdrm.so.2 $output_dir/usr/lib
+	cp /usr/lib/libply.so.2 $output_dir/usr/lib
+	cp /usr/lib/libply-splash-core.so.2 $output_dir/usr/lib
+	cp /usr/lib/libply-splash-graphics.so.2 $output_dir/usr/lib
+	cp /usr/lib/libpng16.so.16 $output_dir/usr/lib
+	cp /usr/lib/libkms.so.1 $output_dir/usr/lib
+	cp /usr/lib/libdrm.so.2 $output_dir/usr/lib
+	cp /lib/libc.so.6 $output_dir/lib
+	cp /lib/librt.so.1 $output_dir/lib
+	cp /lib/libdl.so.2 $output_dir/lib
+	cp /lib/libm.so.6 $output_dir/lib
+	cp /lib/ld-linux-x86-64.so.2 $output_dir/lib
+	cp /lib/libpthread.so.0 $output_dir/lib
+	cp /lib/libkmod.so.2 $output_dir/lib
+	cp /lib/libz.so.1 $output_dir/lib
+	cp /lib/libacl.so.1 $output_dir/lib
+	cp /lib/libuuid.so.1 $output_dir/lib
+	cp /lib/libblkid.so.1 $output_dir/lib
+	cp /lib/libattr.so.1 $output_dir/lib
+	cp /usr/lib/plymouth/text.so $output_dir/usr/lib/plymouth
+	cp /usr/lib/plymouth/label.so $output_dir/usr/lib/plymouth
+	cp /usr/lib/plymouth/details.so $output_dir/usr/lib/plymouth
+	cp /usr/lib/plymouth/renderers/frame-buffer.so $output_dir/usr/lib/plymouth/renderers
+	cp /usr/lib/plymouth/renderers/drm.so $output_dir/usr/lib/plymouth/renderers
+	#cp /usr/share/plymouth/bizcom.png $output_dir/usr/share/plymouth
+	cp /usr/share/plymouth/plymouthd.defaults $output_dir/usr/share/plymouth
+	cp -r /usr/share/plymouth/themes/text $output_dir/usr/share/plymouth/themes
+	cp -r /usr/share/plymouth/themes/details $output_dir/usr/share/plymouth/themes
+	error_check
 
-cp /lib/libc.so.6 $output_dir/lib
-cp /lib/librt.so.1 $output_dir/lib
-cp /lib/libdl.so.2 $output_dir/lib
-cp /lib/libm.so.6 $output_dir/lib
-cp /lib/ld-linux-x86-64.so.2 $output_dir/lib
-cp /lib/libpthread.so.0 $output_dir/lib
-cp /lib/libkmod.so.2 $output_dir/lib
-cp /lib/libz.so.1 $output_dir/lib
+	# Copy plymouth theme
+	#
+	ply_theme=$(plymouth-set-default-theme)
+	ply_theme_file=/usr/share/plymouth/themes/$ply_theme/$ply_theme.plymouth
+	ply_plugins=$(plymouth --get-splash-plugin-path)
+	[ -z "$ply_theme" ] && plymouth_theme=text
+	display_msg 'Copying plymouth theme: '$ply_theme'...'
+	cp -r /usr/share/plymouth/themes/$ply_theme $output_dir/usr/share/plymouth/themes
+	cp -r $ply_plugins$(grep "^ModuleName=" $ply_theme_file | cut -d= -f2-).so $output_dir$ply_plugins
+	ln -s $ply_theme/$ply_theme.plymouth $output_dir/usr/share/plymouth/themes/default.plymouth
+	error_check
 
-cp /lib/libacl.so.1 $output_dir/lib
-cp /lib/libuuid.so.1 $output_dir/lib
-cp /lib/libblkid.so.1 $output_dir/lib
-cp /lib/libattr.so.1 $output_dir/lib
+fi
 
-cp /usr/lib/plymouth/text.so $output_dir/usr/lib/plymouth
-cp /usr/lib/plymouth/details.so $output_dir/usr/lib/plymouth
-cp /usr/lib/plymouth/renderers/frame-buffer.so $output_dir/usr/lib/plymouth/renderers
-cp /usr/lib/plymouth/renderers/drm.so $output_dir/usr/lib/plymouth/renderers
-cp /usr/lib/plymouth/renderers/x11.so $output_dir/usr/lib/plymouth/renderers
-
-cp /usr/share/plymouth/bizcom.png $output_dir/usr/share/plymouth
-cp /usr/share/plymouth/plymouthd.defaults $output_dir/usr/share/plymouth
-cp -r /usr/share/plymouth/themes/text $output_dir/usr/share/plymouth/themes
-cp -r /usr/share/plymouth/themes/details $output_dir/usr/share/plymouth/themes
-error_check
-
-# Copy plymouth theme
+# plymouth pango support
 #
-ply_theme=$(plymouth-set-default-theme)
-ply_theme_file=/usr/share/plymouth/themes/$ply_theme/$ply_theme.plymouth
-ply_plugins=$(plymouth --get-splash-plugin-path)
+if [ $pango_support == 1 ]; then
 
-[ -z "$ply_theme" ] && plymouth_theme=text
-echo 'Copying plymouth theme: '$ply_theme'...'
-cp -r /usr/share/plymouth/themes/$ply_theme $output_dir/usr/share/plymouth/themes
-cp -r $ply_plugins$(grep "^ModuleName=" $ply_theme_file | cut -d= -f2-).so $output_dir$ply_plugins
-ln -s $ply_theme/$ply_theme.plymouth $output_dir/usr/share/plymouth/themes/default.plymouth
+	display_msg 'Copying pango support files...'
+	mkdir -p $output_dir/etc/fonts
+	mkdir -p $output_dir/etc/pango
+	cp /etc/fonts/fonts.conf $output_dir/etc/fonts
+	cp -r /etc/pango/* $output_dir/etc/pango
 
-error_check
+	cp /usr/lib/libpangocairo-1.0.so.0 $output_dir/usr/lib
+	cp /usr/lib/libpango-1.0.so.0 $output_dir/usr/lib
+	cp /usr/lib/libgobject-2.0.so.0 $output_dir/usr/lib
+	cp /usr/lib/libcairo.so.2 $output_dir/usr/lib
+	cp /usr/lib/libpangoft2-1.0.so.0 $output_dir/usr/lib
+	cp /usr/lib/libglib-2.0.so.0 $output_dir/usr/lib
+	cp /usr/lib/libfreetype.so.6 $output_dir/usr/lib
+	cp /usr/lib/libfontconfig.so.1 $output_dir/usr/lib
+	cp /usr/lib/libgmodule-2.0.so.0 $output_dir/usr/lib
+	cp /usr/lib/libffi.so.6 $output_dir/usr/lib
+	cp /usr/lib/libpixman-1.so.0 $output_dir/usr/lib
+	cp /usr/lib/libEGL.so.1 $output_dir/usr/lib
+	cp /usr/lib/libxcb-shm.so.0 $output_dir/usr/lib
+	cp /usr/lib/libxcb-render.so.0 $output_dir/usr/lib
+	cp /usr/lib/libxcb.so.1 $output_dir/usr/lib
+	cp /usr/lib/libXrender.so.1 $output_dir/usr/lib
+	cp /usr/lib/libX11.so.6 $output_dir/usr/lib
+	cp /usr/lib/libXext.so.6 $output_dir/usr/lib
+	cp /usr/lib/libGL.so.1 $output_dir/usr/lib
+	cp /usr/lib/libharfbuzz.so.0 $output_dir/usr/lib
+	cp /lib/libbz2.so.1 $output_dir/lib
+	cp /usr/lib/libexpat.so.1 $output_dir/usr/lib
+	cp /usr/lib/libX11-xcb.so.1 $output_dir/usr/lib
+	cp /usr/lib/libxcb-dri2.so.0 $output_dir/usr/lib
+	cp /usr/lib/libxcb-xfixes.so.0 $output_dir/usr/lib
+	cp /usr/lib/libgbm.so.1 $output_dir/usr/lib
+	cp /usr/lib/libXau.so.6 $output_dir/usr/lib
+	cp /usr/lib/libXdmcp.so.6 $output_dir/usr/lib
+	cp /usr/lib/libatiuki.so.1 $output_dir/usr/lib
+	cp /usr/lib/libgraphite2.so.3 $output_dir/usr/lib
+
+	mkdir -p $output_dir/usr/lib/pango/1.8.0/modules
+	mkdir -p $output_dir/usr/share/fonts/dejavu
+	cp /usr/lib/pango/1.8.0/modules/pango-basic-fc.so $output_dir/usr/lib/pango/1.8.0/modules
+	cp /usr/share/fonts/dejavu/DejaVuSans.ttf $output_dir/usr/share/fonts/dejavu
+	cp /usr/share/fonts/dejavu/DejaVuSans.ttf $output_dir/usr/share/fonts/dejavu
+
+fi
 
 #
 # copy usb firmware
 #
 if [ $copy_firmware == 1 ]; then
-	echo 'Copying USB firmware...'
+	display_msg 'Copying USB firmware...'
 	mkdir -p $output_dir/lib/firmware || last_error=1
 	cp -r /lib/firmware/ar3k $output_dir/lib/firmware/ || last_error=1
 	error_check
 
 	#echo 'Copying modules...'
-	mkdir -p $output_dir/lib/modules/3.16.1/kernel/drivers/char/drm/
-	mkdir -p $output_dir/lib/modules/3.16.1/kernel/drivers/gpu/drm/
-	cp /lib/modules/3.16.1/kernel/drivers/char/drm/fglrx.ko $output_dir/lib/modules/3.16.1/kernel/drivers/char/drm
-	#cp /lib/modules/3.16.1/kernel/drivers/gpu/drm/drm_kms_helper.ko $output_dir/lib/modules/3.16.1/kernel/drivers/gpu/drm
-	#cp -r /lib/modules/3.16.1/kernel/drivers/gpu/drm/ttm $output_dir/lib/modules/3.16.1/kernel/drivers/gpu/drm
+	mkdir -p $output_dir/lib/modules/$(uname -r)/kernel/drivers/char/drm/
+	mkdir -p $output_dir/lib/modules/$(uname -r)/kernel/drivers/gpu/drm/
+	cp /lib/modules/$(uname -r)/kernel/drivers/char/drm/fglrx.ko $output_dir/lib/modules/$(uname -r)/kernel/drivers/char/drm
+	#cp /lib/modules/$(uname -r)/kernel/drivers/gpu/drm/drm_kms_helper.ko $output_dir/lib/modules/$(uname -r)/kernel/drivers/gpu/drm
+	#cp -r /lib/modules/$(uname -r)/kernel/drivers/gpu/drm/ttm $output_dir/lib/modules/$(uname -r)/kernel/drivers/gpu/drm
 	error_check
 fi
 
 # copy resume
 #
-echo 'Copying uswsusp resume...'
-cp /usr/lib/suspend/resume $output_dir/sbin || last_error=1
-cp /etc/suspend.conf $output_dir/etc || last_error=1
-error_check
+if [ $uswsusp_support == 1 ]; then
+	display_msg 'Copying uswsusp support files...'
+	cp /usr/lib/suspend/resume $output_dir/sbin || last_error=1
+	cp /etc/suspend.conf $output_dir/etc || last_error=1
+	error_check
+fi
 
 # copy overlay
 #
 if [ "$overlay" != "" ]; then
-	echo 'Copying overlay...'
+	display_msg 'Copying overlay...'
 	cp -r $overlay/* $output_dir || last_error=1
 	error_check
 fi
 
 # ld.so.conf
 #
-echo 'Generating ld.so.cache...'
+display_msg 'Generating ld.so.cache...'
 echo '/lib' >  $output_dir/etc/ld.so.conf
 echo '/usr/lib' >> $output_dir/etc/ld.so.conf
 ldconfig -r $output_dir
 
 # copy init script
 #
-echo 'Copying init script...'
+display_msg 'Generating init script...'
 
 #########################################
 # begin init script
@@ -274,12 +350,42 @@ error_check()
 	fi
 }
 
+EOF
+
+if [ $plymouth_support == 1 ]; then
+
+	cat >> $output_dir/init << "EOF"
+	plymouth_start()
+	{
+		if [ $show_splash == 1 ]; then
+			#mkdir -p /run/plymouth
+			#plymouthd --attach-to-session --pid-file /run/plymouth/pid --mode=shutdown --kernel-command-line="splash"
+			plymouthd --mode=shutdown --kernel-command-line="quiet splash"
+			plymouth --show-splash
+		fi
+	}
+
+	plymouth_set_message()
+	{
+		plymouth display-message --text=msg
+		plymouth display-message --text="$1"
+	}
+
+	plymouth_set_boot_mode()
+	{
+		plymouth change-mode --boot-up
+		plymouth display-message --text=show-progress
+	}
+
+EOF
+fi
+
+cat >> $output_dir/init << "EOF"
 # clean input/output
 #
 exec >/dev/console </dev/console 2>&1
 
 # make sure that /sbin and /usr/sbin are in PATH
-# dmraid for instance is in /usr/sbin
 #
 PATH="${PATH}:/sbin:/usr/sbin"
 
@@ -289,6 +395,8 @@ debug=0
 show_splash=0
 last_error=0
 init_opts=""
+uswsusp=0
+swsusp_resume=""
 
 # mount virtual filesystems
 #
@@ -310,19 +418,6 @@ error_check
 mount -t sysfs sysfs /sys -o noexec,nosuid,nodev > /dev/null 2>&1 || last_error=1
 error_check
 
-# invoke uswsusp resume
-#
-/sbin/resume &
-resume_pid=$!
-sleep 1
-if [ "$(kill -0 $resume_pid 2>&1)" == "" ]; then
-	echo -en "\x1b[2K\rResuming...\n"
-	while [ "$(kill -0 $resume_pid 2>&1)" == "" ];
-	do
-		sleep 2
-	done
-fi
-
 # parse command line
 #
 for x in $(cat /proc/cmdline); do
@@ -342,35 +437,116 @@ for x in $(cat /proc/cmdline); do
 		splash)
 			show_splash=1
 		;;
+		swsusp_resume=*)
+			swsusp_resume=${x#*=}
+			#swsusp_resume=$(readlink -f ${swsusp_resume} | awk -F '/' '{ print $3 }')
+			#swsusp_resume=$(cat /sys/class/block/${swsusp_resume}/dev) 
+		;;
+		uswsusp)
+			uswsusp=1
+		;;
 	esac
 done
 
-# start plymouthd and show splash screen
-#
-if [ $show_splash == 1 ] && [ $quiet == 1 ]; then
-	mkdir -p /run/plymouth
-	plymouthd --attach-to-session --pid-file /run/plymouth/pid --mode=boot
-	plymouth --show-splash
+EOF
+
+if [ $uswsusp_support == 1 ]; then
+
+	cat >> $output_dir/init << "EOF"
+	# invoke uswsusp resume
+	#
+	if [ $uswsusp == 1 ]; then
+		/sbin/resume &
+		resume_pid=$!
+		sleep 1
+		if [ "$(kill -0 $resume_pid 2>&1)" == "" ]; then
+			echo -en "\x1b[2K\rResuming...\n"
+			while [ "$(kill -0 $resume_pid 2>&1)" == "" ];
+			do
+				sleep 2
+			done
+		fi
+	fi
+
+EOF
+fi
+
+if [ $plymouth_support == 1 ]; then
+
+	cat >> $output_dir/init << "EOF"
+	# start plymouthd and show splash screen
+	#
+	plymouth_start
+EOF
 fi
 
 #/sbin/resume
 
-# if there's a linuxrc script execute it now
-#
-if [ -x /linuxrc ]; then
-	exec sh /linuxrc
+if [ $swsusp_support == 1 ] && [ $plymouth_support == 1 ]; then
+
+	cat >> $output_dir/init << "EOF"
+
+	# Resume using swsusp
+	#
+	if [ "$swsusp_resume" != "" ]; then
+		plymouth_set_message "Thawing System..."
+		echo "$swsusp_resume" > /sys/power/resume
+		plymouth_set_boot_mode
+		plymouth_set_message "Booting System..."
+	else
+		plymouth_set_boot_mode
+		plymouth_set_message "Booting System..."
+	fi
+
+EOF
+elif [ $swsusp_support == 1 ]; then
+
+	cat >> $output_dir/init << "EOF"
+	# Resume using swsusp
+	#
+	if [ "$swsusp_resume" != "" ]; then
+		echo "$swsusp_resume" > /sys/power/resume
+	fi
+
+EOF
+elif [ $plymouth_support == 1 ]; then
+	cat >> $output_dir/init << "EOF"
+	plymouth_set_boot_mode
+	plymouth_set_message "Booting System..."
+
+EOF
 fi
 
+if [ "$overlay" != "" ]; then
+	cat >> $output_dir/init << "EOF"
+	# if there's a linuxrc script execute it now
+	#
+	if [ -x /linuxrc ]; then
+		exec sh /linuxrc
+	fi
+
+EOF
+fi
+
+cat >> $output_dir/init << "EOF"
 # mount the new root filesystem
 #
 mount -o ro $fake_root /newroot
 
-# inform plymouth of new root
-#
-if [ $show_splash == 1 ] && [ $quiet == 1 ]; then
-	plymouth --newroot=/newroot
+EOF
+
+if [ $plymouth_support == 1 ]; then
+	cat >> $output_dir/init << "EOF"
+	# inform plymouth of new root
+	#
+	if [ $show_splash == 1 ]; then
+		plymouth --newroot=/newroot
+	fi
+
+EOF
 fi
 
+cat >> $output_dir/init << "EOF"
 # move virtual filesystems to new root
 #
 mount --move /run /newroot/run
@@ -382,12 +558,25 @@ mount --move /proc /newroot/proc
 #
 exec /sbin/switch_root -c /dev/console /newroot /sbin/init "$init_opts"
 
+#
 # If we get here, something bad has happened
 #
-if [ $show_splash == 1 ] && [ $quiet == 1 ]; then
-	plymouth --hide-splash
+
+EOF
+
+if [ $plymouth_support == 1 ]; then
+
+	cat >> $output_dir/init << "EOF"
+	# hide splash screen
+	#
+	if [ $show_splash == 1 ]; then
+		plymouth --hide-splash
+	fi
+
+EOF
 fi
 
+cat >> $output_dir/init << "EOF"
 # if the debug option was specified then attempt to
 # start a shell, otherwise just display an error message
 #
@@ -418,7 +607,7 @@ error_check
 
 # create cpio archive
 #
-echo 'Creating cpio archive...'
+display_msg 'Creating cpio archive...'
 cd $output_dir
 find . -print0 | cpio --null -o --format=newc > $source_dir/initramfs.cpio || last_error=1
 error_check
@@ -462,6 +651,6 @@ fi
 # remove tmp files
 #
 echo 'Cleaning up...'
-rm -r $source_dir || last_error=1
-error_check
+#rm -r $source_dir || last_error=1
+#error_check
 
