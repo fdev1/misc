@@ -32,6 +32,9 @@ plymouth_hide_progress()
   /usr/bin/plymouth display-message --text=hide-progress
 }
 
+# kill processes started
+# from ttys
+#
 kill_tty_processes()
 {
   procs_arr=$(/bin/cat /sys/fs/cgroup/openrc/ttys/tasks)
@@ -47,6 +50,8 @@ kill_tty_processes()
   done
 }
 
+# restore all services to their propper boot up state.
+#
 restore_runlevel_services()
 {
   # prepare list of all openrc services, their states and a list
@@ -97,11 +102,17 @@ splash=0
 bootmode=$1
 swsusp_resume=""
 
-if [ "$bootmode" != "shutdown" ] && [ "$bootmode" != "kde" ] && [ "$bootmode" != "kde-nohup" ]; then
-  bootmode=boot
-fi
+case "$bootmode" in
+  shutdown) shift;;
+  kde) shift;;
+  kde-nohup) shift;;
+  init) shift;;
+  boot) shift;;
 
-shift
+  # todo: make sure this is pid 1
+  #
+  *) bootmode="boot" ;;
+esac
 
 if [ "$bootmode" == "boot" ]; then
   /bin/mount -o remount,ro / >/dev/null 2>&1
@@ -160,6 +171,27 @@ case $bootmode in
     exec /sbin/init
     ;;
 
+  init)
+
+    # create a cgroup for all processes
+    # started from tty logins
+    #
+    /usr/bin/cgcreate -g "name=openrc":/ttys
+
+    # hide the blinking cursor in all terminals except the
+    # ones with logins
+    #
+    /bin/echo -e '\033[?17;0;0c' > /dev/tty5
+    /bin/echo -e '\033[?17;0;0c' > /dev/tty6
+    /bin/echo -e '\033[?17;0;0c' > /dev/tty7
+    /bin/echo -e '\033[?17;0;0c' > /dev/tty8
+    /bin/echo -e '\033[?17;0;0c' > /dev/tty9
+    /bin/echo -e '\033[?17;0;0c' > /dev/tty10
+    /bin/echo -e '\033[?17;0;0c' > /dev/tty11
+    /bin/echo -e '\033[?17;0;0c' > /dev/tty12
+
+    ;;
+
   shutdown)
     # start plymouth and show splash if booting with the
     # splash and quiet options
@@ -173,13 +205,8 @@ case $bootmode in
     $@
     ;;
 
-  agetty)
-    /usr/bin/cgcreate -g "name=openrc":/free
-    /usr/bin/cgexec -g "name=openrc":/free /sbin/agetty $@
-    ;;
-    
   kde)
-    /usr/bin/cgcreate -g "name=openrc":/free
+    [ -d /sys/fs/openrc/free ] || /usr/bin/cgcreate -g "name=openrc":/free
     /usr/bin/cgexec -g "name=openrc":/free /etc/splash.rc kde-nohup
     ;;
 
@@ -219,3 +246,4 @@ case $bootmode in
     /usr/sbin/pm-hibernate
     ;;
 esac
+
