@@ -32,6 +32,21 @@ plymouth_hide_progress()
   /usr/bin/plymouth display-message --text=hide-progress
 }
 
+kill_tty_processes()
+{
+  procs_arr=$(/bin/cat /sys/fs/cgroup/openrc/ttys/tasks)
+
+  for proc in $procs_arr
+  do
+    /bin/kill $proc
+  done
+
+  for proc in $procs_arr
+  do
+    /bin/kill -9 $proc
+  done
+}
+
 restore_runlevel_services()
 {
   # prepare list of all openrc services, their states and a list
@@ -55,6 +70,7 @@ restore_runlevel_services()
       if [ "${svcs_arr[$((i * 2))]}" == "$svc" ]; then
         found=1
         if [ "${svcs_arr[$(((i * 2) + 1))]}" != "started" ]; then
+          /sbin/rc-service $svc cgroup_cleanup
           /sbin/rc-service $svc start
         fi
       fi
@@ -69,7 +85,7 @@ restore_runlevel_services()
         done
         if [ $found == 0 ]; then
           /sbin/rc-service ${svcs_arr[$((i * 2))]} stop
-          #echo "Stopping "${svcs_arr[$((i * 2))]}"..."
+          /sbin/rc-service ${svcs_arr[$((i * 2))]} cgroup_cleanup
         fi
       fi
     fi
@@ -157,6 +173,11 @@ case $bootmode in
     $@
     ;;
 
+  agetty)
+    /usr/bin/cgcreate -g "name=openrc":/free
+    /usr/bin/cgexec -g "name=openrc":/free /sbin/agetty $@
+    ;;
+    
   kde)
     /usr/bin/cgcreate -g "name=openrc":/free
     /usr/bin/cgexec -g "name=openrc":/free /etc/splash.rc kde-nohup
@@ -169,6 +190,11 @@ case $bootmode in
       plymouth_start_daemon
       plymouth_show_splash
     fi
+    
+    # kill all processes in TTY logins
+    #
+    plymouth_set_message "Killing TTY processes..."
+    kill_tty_processes
 
     # stop the xdm service and kill all processes
     # in it's group
