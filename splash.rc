@@ -1,0 +1,195 @@
+#!/bin/bash
+
+plymouth_start_daemon()
+{
+  /usr/bin/plymouth --ping && /usr/bin/plymouth change-mode --shutdown ||
+    /sbin/plymouthd --mode=shutdown --kernel-command-line="quiet splash"
+}
+
+plymouth_set_boot_mode()
+{
+  /usr/bin/plymouth change-mode --boot-up
+}
+
+plymouth_set_message()
+{
+  /usr/bin/plymouth display-message --text=msg
+  /usr/bin/plymouth display-message --text="$1"
+}
+
+plymouth_show_splash()
+{
+  /usr/bin/plymouth --show-splash
+}
+
+plymouth_show_progress()
+{
+  /usr/bin/plymouth display-message --text=show-progress
+}
+
+plymouth_hide_progress()
+{
+  /usr/bin/plymouth display-message --text=hide-progress
+}
+
+restore_runlevel_services()
+{
+  # prepare list of all openrc services, their states and a list
+  # list of services in the sysinit, boot, and default runlevels
+  #
+  found=0
+  svcs_arr=(`/bin/rc-status --all | /bin/grep "\[" | /bin/sed "s/\[//;s/\]//;s/ *//" | /bin/tr -s " "`)
+  svcs_len=${#svcs_arr[@]}
+  svcs_len=$(((svcs_len) / 2))
+  svcs_preserve=$(/bin/echo "dbus xdm-setup")
+  runlevel_svcs=$(/bin/ls /etc/runlevels/sysinit /etc/runlevels/boot /etc/runlevels/default)
+
+  # loop through the list of processes and make sure that every process
+  # is on the same state as right after boot up
+  #
+  for ((i=0; i<$svcs_len; i++))
+  do
+    found=0
+    for svc in $runlevel_svcs
+    do
+      if [ "${svcs_arr[$((i * 2))]}" == "$svc" ]; then
+        found=1
+        if [ "${svcs_arr[$(((i * 2) + 1))]}" != "started" ]; then
+          /sbin/rc-service $svc start
+        fi
+      fi
+    done
+    if [ $found == 0 ]; then
+      if [ "${svcs_arr[$(((i * 2) + 1))]}" == "started" ]; then
+        for psvd_svc in $svcs_preserve
+        do
+          if [ "${svcs_arr[$((i * 2))]}" == "$psvd_svc" ]; then
+            found=1
+          fi
+        done
+        if [ $found == 0 ]; then
+          /sbin/rc-service ${svcs_arr[$((i * 2))]} stop
+          #echo "Stopping "${svcs_arr[$((i * 2))]}"..."
+        fi
+      fi
+    fi
+  done
+}
+
+quiet=0
+splash=0
+bootmode=$1
+swsusp_resume=""
+
+if [ "$bootmode" != "shutdown" ] && [ "$bootmode" != "kde" ] && [ "$bootmode" != "kde-nohup" ]; then
+  bootmode=boot
+fi
+
+shift
+
+if [ "$bootmode" == "boot" ]; then
+  /bin/mount -o remount,ro / >/dev/null 2>&1
+  /bin/mount -t proc -o noexec,nosuid,nodev proc /proc >/dev/null 2>&1
+  /bin/mount -t sysfs -o rw,nosuid,relatime,mode=755 none /sys 2>&1
+fi
+
+# parse the command line
+#
+for arg in $(/bin/cat /proc/cmdline);
+do
+  case "${arg}" in
+    quiet)
+      quiet=1
+      ;;
+    splash)
+      splash=1
+      ;;
+    swsusp_resume=*)
+      swsusp_resume=${arg#*=}
+      #swsusp_resume=$(readlink -f ${swsusp_resume} | awk -F '/' '{ print $3 }')
+      #swsusp_resume=$(cat /sys/class/block/${swsusp_resume}/dev)
+      ;;
+  esac
+done
+
+case $bootmode in
+  boot)
+    # start plymouth and show splash if booting with the
+    # splash and quiet options
+    #
+    if [ $splash == 1 ]; then
+      plymouth_start_daemon
+      plymouth_show_splash
+    fi
+
+    # Resume using swsusp
+    #
+    if [ "$swsusp_resume" != "" ]; then
+
+      plymouth_set_message "Thawing System..."
+
+      /bin/sync
+      echo "$swsusp_resume" > /sys/power/resume
+
+      plymouth_set_boot_mode
+      plymouth_show_progress
+      plymouth_set_message "Booting System..."
+
+    else
+      plymouth_set_boot_mode
+      plymouth_show_progress
+      plymouth_set_message "Booting System..."
+    fi
+
+    exec /sbin/init
+    ;;
+
+  shutdown)
+    # start plymouth and show splash if booting with the
+    # splash and quiet options
+    #
+    if [ $splash == 1 ]; then
+      plymouth_start_daemon
+      plymouth_show_progress
+      plymouth_set_message "Shutting down..."
+      plymouth_show_splash
+    fi
+    $@
+    ;;
+
+  kde)
+    /usr/bin/cgcreate -g "name=openrc":/free
+    /usr/bin/cgexec -g "name=openrc":/free /etc/splash.rc kde-nohup
+    ;;
+
+  kde-nohup)
+    # start splash screen
+    #
+    if [ $splash == 1 ]; then
+      plymouth_start_daemon
+      plymouth_show_splash
+    fi
+
+    # stop the xdm service and kill all processes
+    # in it's group
+    #
+    plymouth_set_message "Killing user processes..."
+    /sbin/rc-service xdm stop
+    /sbin/rc-service xdm cgroup_cleanup
+
+    # restart all default runlevel services
+    #
+    plymouth_set_message "Restoring default runlevel services..."
+    restore_runlevel_services
+    
+    # restart kdm
+    #
+    plymouth_set_message "Restarting KDM..."
+    /sbin/rc-service xdm restart 
+    /usr/bin/sleep 6
+
+    # hibernate system
+    #
+    /usr/sbin/pm-hibernate
+    ;;
+esac
