@@ -104,10 +104,12 @@ swsusp_resume=""
 
 case "$bootmode" in
   shutdown) shift;;
-  kde) shift;;
-  kde-nohup) shift;;
+  kde|poweroff) shift;;
+  kde-nohup|poweroff-daemon) shift;;
   init) shift;;
   boot) shift;;
+  hibernate-hook) shift;;
+  suspend-hook) shift;;
 
   # todo: make sure this is pid 1
   #
@@ -205,12 +207,28 @@ case $bootmode in
     $@
     ;;
 
-  kde)
+  hibernate-hook)
+    plymouth_start_daemon
+    plymouth_hide_progress
+    plymouth_set_message "Hibernating System..."
+    plymouth_show_splash
+    /bin/sync
+    ;;
+
+  suspend-hook)
+    plymouth_start_daemon
+    plymouth_hide_progress
+    plymouth_set_message "Suspending System..."
+    plymouth_show_splash
+    /bin/sync
+    ;;
+
+  kde|poweroff)
     [ -d /sys/fs/openrc/free ] || /usr/bin/cgcreate -g "name=openrc":/free
     /usr/bin/cgexec -g "name=openrc":/free /etc/splash.rc kde-nohup
     ;;
 
-  kde-nohup)
+  kde-nohup|poweroff-daemon)
     # start splash screen
     #
     if [ $splash == 1 ]; then
