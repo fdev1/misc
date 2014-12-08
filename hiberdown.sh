@@ -1,4 +1,22 @@
 #!/bin/bash
+#
+# fastdown script v0.1
+# Copyright (C) 2014 Fernando Rodriguez (frodriguez.developer@outlook.com)
+#
+# This program is free software; you can redistribute it and/or modify
+# it under the terms of the GNU General Public License Version 3 as
+# published by the Free Software Foundation.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program; if not, write to the Free Software
+# Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
+
+source /etc/hiberdown.conf
 
 plymouth_start_daemon()
 {
@@ -61,7 +79,7 @@ restore_runlevel_services()
   svcs_arr=(`/bin/rc-status --all | /bin/grep "\[" | /bin/sed "s/\[//;s/\]//;s/ *//" | /bin/tr -s " "`)
   svcs_len=${#svcs_arr[@]}
   svcs_len=$(((svcs_len) / 2))
-  svcs_preserve=$(/bin/echo "dbus xdm-setup")
+  svcs_preserve=$(/bin/echo $preserved_services)
   runlevel_svcs=$(/bin/ls /etc/runlevels/sysinit /etc/runlevels/boot /etc/runlevels/default)
 
   # loop through the list of processes and make sure that every process
@@ -183,15 +201,10 @@ case $bootmode in
     # hide the blinking cursor in all terminals except the
     # ones with logins
     #
-    /bin/echo -e '\033[?17;0;0c' > /dev/tty5
-    /bin/echo -e '\033[?17;0;0c' > /dev/tty6
-    /bin/echo -e '\033[?17;0;0c' > /dev/tty7
-    /bin/echo -e '\033[?17;0;0c' > /dev/tty8
-    /bin/echo -e '\033[?17;0;0c' > /dev/tty9
-    /bin/echo -e '\033[?17;0;0c' > /dev/tty10
-    /bin/echo -e '\033[?17;0;0c' > /dev/tty11
-    /bin/echo -e '\033[?17;0;0c' > /dev/tty12
-
+    for tty in $(/bin/echo $free_ttys)
+    do
+      /bin/echo -e '\033[?17;0;0c' > /dev/$tty
+    done
     ;;
 
   shutdown)
@@ -223,12 +236,12 @@ case $bootmode in
     /bin/sync
     ;;
 
-  kde|poweroff)
+  poweroff)
     [ -d /sys/fs/openrc/free ] || /usr/bin/cgcreate -g "name=openrc":/free
-    /usr/bin/cgexec -g "name=openrc":/free /etc/splash.rc kde-nohup
+    /usr/bin/cgexec -g "name=openrc":/free $(realpath ${BASH_SOURCE[0]}) poweroff-daemon
     ;;
 
-  kde-nohup|poweroff-daemon)
+  poweroff-daemon)
     # start splash screen
     #
     if [ $splash == 1 ]; then
@@ -257,7 +270,7 @@ case $bootmode in
     #
     plymouth_set_message "Restarting KDM..."
     /sbin/rc-service xdm restart 
-    /usr/bin/sleep 6
+    /usr/bin/sleep $dm_restart_time
 
     # hibernate system
     #
