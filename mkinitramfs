@@ -360,21 +360,23 @@ if [ $plymouth_support == 1 ]; then
 		if [ $show_splash == 1 ]; then
 			#mkdir -p /run/plymouth
 			#plymouthd --attach-to-session --pid-file /run/plymouth/pid --mode=shutdown --kernel-command-line="splash"
-			plymouthd --mode=shutdown --kernel-command-line="quiet splash"
+			plymouthd --mode=shutdown --kernel-command-line="splash"
 			plymouth --show-splash
 		fi
 	}
 
 	plymouth_set_message()
 	{
-		plymouth display-message --text=msg
-		plymouth display-message --text="$1"
+		#plymouth display-message --text=msg
+		#plymouth display-message --text="$1"
+		plymouth update --status=msg
+		plymouth update --status="$1"
 	}
 
 	plymouth_set_boot_mode()
 	{
 		plymouth change-mode --boot-up
-		plymouth display-message --text=show-progress
+		plymouth update --status=show-progress
 	}
 
 EOF
@@ -458,7 +460,7 @@ if [ $uswsusp_support == 1 ]; then
 	if [ $uswsusp == 1 ]; then
 		/sbin/resume &
 		resume_pid=$!
-		sleep 1
+		sleep 0.5
 		if [ "$(kill -0 $resume_pid 2>&1)" == "" ]; then
 			echo -en "\x1b[2K\rResuming...\n"
 			while [ "$(kill -0 $resume_pid 2>&1)" == "" ];
@@ -490,6 +492,7 @@ if [ $swsusp_support == 1 ] && [ $plymouth_support == 1 ]; then
 	#
 	if [ "$swsusp_resume" != "" ]; then
 		plymouth_set_message "Thawing System..."
+		sleep 0.25
 		echo "$swsusp_resume" > /sys/power/resume
 		plymouth_set_boot_mode
 		plymouth_set_message "Booting System..."
