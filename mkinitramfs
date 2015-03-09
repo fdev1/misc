@@ -18,6 +18,8 @@
 # Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
 #
 
+BULLET="\033[0;32m *\033[0m"
+REDBUL="\033[0;31m !!\033[0m"
 
 current_dir=$(pwd)
 source_dir=/var/tmp/mkinitramfs
@@ -50,7 +52,7 @@ copy_links()
 
 display_msg()
 {
-	echo "$1"
+	echo -e "$BULLET $1"
 }
 
 # parse command line
@@ -161,7 +163,7 @@ error_check
 #
 # creating fstab
 #
-echo 'Creating fstab...'
+display_msg 'Creating fstab...'
 echo "/dev/ram0     /           ext2    defaults    0 0" >  $output_dir/etc/fstab
 echo "proc          /proc       proc    defaults    0 0" >> $output_dir/etc/fstab
 
@@ -213,6 +215,7 @@ if [ $plymouth_support == 1 ]; then
 	cp /usr/lib/plymouth/details.so $output_dir/usr/lib/plymouth
 	cp /usr/lib/plymouth/renderers/frame-buffer.so $output_dir/usr/lib/plymouth/renderers
 	cp /usr/lib/plymouth/renderers/drm.so $output_dir/usr/lib/plymouth/renderers
+
 	#cp /usr/share/plymouth/bizcom.png $output_dir/usr/share/plymouth
 	cp /usr/share/plymouth/plymouthd.defaults $output_dir/usr/share/plymouth
 	cp -r /usr/share/plymouth/themes/text $output_dir/usr/share/plymouth/themes
@@ -241,7 +244,9 @@ if [ $pango_support == 1 ]; then
 	mkdir -p $output_dir/etc/fonts
 	mkdir -p $output_dir/etc/pango
 	cp /etc/fonts/fonts.conf $output_dir/etc/fonts
-	cp -r /etc/pango/* $output_dir/etc/pango
+	#cp -r /etc/fonts/* $output_dir/etc/fonts
+	echo "/usr/lib/pango/1.8.0/modules/pango-basic-fc.so BasicScriptEngineFc PangoEngineShape PangoRenderFc common:" \
+		> $output_dir/etc/pango/pango.modules
 
 	cp /usr/lib/libpangocairo-1.0.so.0 $output_dir/usr/lib
 	cp /usr/lib/libpango-1.0.so.0 $output_dir/usr/lib
@@ -273,12 +278,17 @@ if [ $pango_support == 1 ]; then
 	cp /usr/lib/libXdmcp.so.6 $output_dir/usr/lib
 	cp /usr/lib/libatiuki.so.1 $output_dir/usr/lib
 	cp /usr/lib/libgraphite2.so.3 $output_dir/usr/lib
+	cp /usr/lib/libglapi.so.0 $output_dir/usr/lib
+	cp /usr/lib/libxcb-shape.so.0 $output_dir/usr/lib
 
 	mkdir -p $output_dir/usr/lib/pango/1.8.0/modules
 	mkdir -p $output_dir/usr/share/fonts/dejavu
+
 	cp /usr/lib/pango/1.8.0/modules/pango-basic-fc.so $output_dir/usr/lib/pango/1.8.0/modules
 	cp /usr/share/fonts/dejavu/DejaVuSans.ttf $output_dir/usr/share/fonts/dejavu
-	cp /usr/share/fonts/dejavu/DejaVuSans.ttf $output_dir/usr/share/fonts/dejavu
+
+        echo "/usr/lib/pango/1.8.0/modules/pango-basic-fc.so BasicScriptEngineFc PangoEngineShape PangoRenderFc common:" \
+		> $output_dir/etc/pango/pango.modules
 
 fi
 
@@ -626,7 +636,7 @@ error_check
 
 if [ "$compress_method" != "" ]; then
 
-	echo 'Compressing archive ('$compress_method')...'
+	display_msg 'Compressing archive ('$compress_method')...'
 
 	case $compress_method in
 		gzip)
@@ -653,7 +663,7 @@ fi
 
 # remove tmp files
 #
-echo 'Cleaning up...'
+display_msg 'Cleaning up...'
 #rm -r $source_dir || last_error=1
 #error_check
 
