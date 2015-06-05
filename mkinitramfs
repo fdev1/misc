@@ -30,7 +30,7 @@ copy_firmware=0
 overlay=""
 pango_support=1
 plymouth_support=1
-uswsusp_support=1
+uswsusp_support=0
 swsusp_support=1
 compress_method="xz"
 

@@ -21,7 +21,7 @@ source /etc/hiberdown.conf
 plymouth_start_daemon()
 {
   /usr/bin/plymouth --ping && /usr/bin/plymouth change-mode --shutdown ||
-    /sbin/plymouthd --mode=shutdown --kernel-command-line="quiet splash"
+    /sbin/plymouthd --mode=shutdown --kernel-command-line="splash"
 }
 
 plymouth_set_boot_mode()
@@ -31,8 +31,10 @@ plymouth_set_boot_mode()
 
 plymouth_set_message()
 {
-  /usr/bin/plymouth display-message --text=msg
-  /usr/bin/plymouth display-message --text="$1"
+  #/usr/bin/plymouth display-message --text=msg
+  #/usr/bin/plymouth display-message --text="$1"
+  /usr/bin/plymouth update --status=msg
+  /usr/bin/plymouth update --status="$1"
 }
 
 plymouth_show_splash()
@@ -214,8 +216,8 @@ case $bootmode in
     if [ $splash == 1 ]; then
       plymouth_start_daemon
       plymouth_show_progress
-      plymouth_set_message "Shutting down..."
       plymouth_show_splash
+      plymouth_set_message "Shutting down..."
     fi
     $@
     ;;
