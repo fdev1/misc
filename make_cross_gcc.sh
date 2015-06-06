@@ -3,7 +3,7 @@
 # http://preshing.com/20141119/how-to-build-a-gcc-cross-compiler/
 #
 
-PREFIX=/opt/gcc-i586
+PREFIX=/home/fernan/gcc-i586
 TARGET=i586-pc-linux-gnu
 GCC_VER=4.8.4
 JOBS=2
@@ -101,6 +101,28 @@ if [ "$1" == "--progress-filter" ]; then
         exit 0
 fi
 
+# do our best to detect the host platform
+# and default compiler to use
+#
+case $(uname) in
+        Darwin)
+                JOBS=$(/usr/sbin/sysctl -n hw.ncpu)
+                #if [ "$(which automake-1.11)" == "" ]; then
+                #       NEED_AUTOMAKE_1_11=1
+                #fi 
+        ;;  
+        CYGWIN*)
+                #XHOST=i686-pc-mingw32
+                JOBS=$(cat /proc/cpuinfo | grep processor | wc -l)
+                #export PATH=/opt/gcc-tools/epoch2/bin/:$PATH
+        ;;  
+        Linux)
+                JOBS=$(cat /proc/cpuinfo | grep processor | wc -l)
+        ;;  
+esac
+
+
+
 
 SCRIPTPATH="$( cd $(dirname $0)/ ; pwd -P )"
 cd "$SCRIPTPATH"
@@ -112,8 +134,18 @@ export PATH=$PREFIX/bin:$PATH
 BULLET="\033[0;32m *\033[0m"
 REDBUL="\033[0;31m !!\033[0m"
 
+
+print_msg "Jobs: ${JOBS}"
+print_msg "Target: ${TARGET}"
+print_msg "Prefix: ${PREFIX}"
+
 mkdir -p distfiles
 cd distfiles
+dowget http://ftp.gnu.org/gnu/binutils/binutils-2.24.tar.gz
+dowget http://ftp.gnu.org/gnu/gcc/gcc-4.8.4.tar.gz
+dowget https://gmplib.org/download/gmp/gmp-6.0.0a.tar.lz
+dowget http://www.mpfr.org/mpfr-current/mpfr-3.1.2.tar.xz
+dowget ftp://ftp.gnu.org/gnu/mpc/mpc-1.0.3.tar.gz
 dowget http://ftp.gnu.org/gnu/glibc/glibc-2.20.tar.xz
 dowget https://www.kernel.org/pub/linux/kernel/v3.x/linux-3.18.14.tar.xz
 cd ..
@@ -140,6 +172,8 @@ untar distfiles/glibc-2.20.tar.xz || err=1
 untar distfiles/linux-3.18.14.tar.xz || err=1
 [ $err == 1 ] && exit -1
 
+
+if [ 1 == 1 ]; then
 print_msg "Installing Linux headers..."
 cd linux-3.18.14
 make ARCH=${LINUX_ARCH} INSTALL_HDR_PATH=${PREFIX} headers_install
@@ -192,6 +226,7 @@ check_err "Error building GCC!!"
 make install-gcc || err=1
 check_err "Error installing GCC!!"
 cd ..
+fi
 
 print_msg "Configuring glibc..."
 mkdir -p build-glibc
@@ -200,6 +235,7 @@ cd build-glibc
 	--prefix=$PREFIX \
 	--build=$(gcc -dumpmachine) \
 	--host=$TARGET \
+	--with-sysroot=$PREFIX \
 	--enable-kernel=2.6.32 \
 	--with-headers=$PREFIX/include \
 	libc_cv_forced_unwind=yes || err=1
