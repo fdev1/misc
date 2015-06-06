@@ -134,10 +134,10 @@ export PATH=$PREFIX/bin:$PATH
 BULLET="\033[0;32m *\033[0m"
 REDBUL="\033[0;31m !!\033[0m"
 
-
-print_msg "Jobs: ${JOBS}"
 print_msg "Target: ${TARGET}"
 print_msg "Prefix: ${PREFIX}"
+print_msg "Path: ${PATH}"
+print_msg "Jobs: ${JOBS}"
 
 mkdir -p distfiles
 cd distfiles
@@ -153,6 +153,7 @@ cd ..
 mkdir -p $PREFIX || err=1
 check_err "Unable to create/access target directory!"
 
+if [ 1 == 1 ]; then
 print_msg "Cleaning up build directories..."
 rm -rf gcc-${GCC_VER}
 rm -rf binutils-2.24
@@ -171,7 +172,24 @@ untar distfiles/mpfr-3.1.2.tar.xz || err=1
 untar distfiles/glibc-2.20.tar.xz || err=1
 untar distfiles/linux-3.18.14.tar.xz || err=1
 [ $err == 1 ] && exit -1
+fi
 
+print_msg "Compiling binutils..."
+mkdir -p build-binutils
+cd build-binutils
+../binutils-2.24/configure \
+	--target=$TARGET \
+	--prefix=$PREFIX \
+	--with-sysroot \
+	--disable-werror \
+	--disable-nls || err=1
+	#--with-lib-path=$PREFIX/lib \
+check_err "Error configuring binutils..."
+make || err=1
+check_err "Error conpiling binutils..."
+make install || err=1
+check_err "Error installing binutils..."
+cd ..
 
 if [ 1 == 1 ]; then
 print_msg "Installing Linux headers..."
@@ -182,23 +200,6 @@ mkdir -p ${PREFIX}/usr
 	(ln -fs ${PREFIX}/include ${PREFIX}/usr/include || err=1)
 check_err "Could not create ${PREFIX}/usr/include symlink!!"
 cd ..
-
-print_msg "Compiling binutils..."
-mkdir -p build-binutils
-cd build-binutils
-../binutils-2.24/configure \
-	--target=$TARGET \
-	--prefix=$PREFIX \
-	--with-lib-path=$PREFIX/lib \
-	--disable-werror \
-	--disable-nls || err=1
-check_err "Error configuring binutils..."
-make || err=1
-check_err "Error conpiling binutils..."
-make install || err=1
-check_err "Error installing binutils..."
-cd ..
-
 
 print_msg "Preparing GCC..."
 mv gmp-6.0.0 gcc-${GCC_VER}/gmp
@@ -212,13 +213,26 @@ cd ..
 print_msg "Configuring GCC..."
 mkdir -p build-gcc
 cd build-gcc
+#../gcc-4.8.4/configure \
+#	--target=$TARGET \
+#	--prefix=$PREFIX \
+#	--enable-languages=c,c++ \
+#	--with-sysroot=$PREFIX \
+#	--without-docdir \
+#	--disable-nls || err=1
+
 ../gcc-4.8.4/configure \
 	--target=$TARGET \
 	--prefix=$PREFIX \
 	--enable-languages=c,c++ \
-	--with-sysroot=$PREFIX \
+	--disable-libmudflap \
+	--with-headers=$PREFIX/include \
+	--with-native-system-header-dir=$PREFIX/include \
 	--without-docdir \
 	--disable-nls || err=1
+
+
+
 check_err "Error configuring GCC!!"
 print_msg "Compiling GCC..."
 make all-gcc || err=1
@@ -226,7 +240,6 @@ check_err "Error building GCC!!"
 make install-gcc || err=1
 check_err "Error installing GCC!!"
 cd ..
-fi
 
 print_msg "Configuring glibc..."
 mkdir -p build-glibc
@@ -235,7 +248,6 @@ cd build-glibc
 	--prefix=$PREFIX \
 	--build=$(gcc -dumpmachine) \
 	--host=$TARGET \
-	--with-sysroot=$PREFIX \
 	--enable-kernel=2.6.32 \
 	--with-headers=$PREFIX/include \
 	libc_cv_forced_unwind=yes || err=1
@@ -256,6 +268,7 @@ touch ${PREFIX}/include/gnu/stubs.h || err=1
 [ $err == 1 ] && exit -1
 cd ..
 
+
 print_msg "Compiling libgcc..."
 cd build-gcc
 make -j${JOBS} all-target-libgcc || err=1
@@ -271,9 +284,21 @@ check_err "Error building glibc!!"
 make install || err=1
 check_err "Error installing glibc!!"
 cd ..
+fi
 
 print_msg "Compiling gcc support libraries..."
 cd build-gcc
+
+#../gcc-4.8.4/configure \
+#	--target=$TARGET \
+#	--prefix=$PREFIX \
+#	--enable-languages=c,c++ \
+#	--disable-libmudflap \
+#	--with-headers=$PREFIX/include \
+#	--with-native-system-header-dir=$PREFIX/include \
+#	--without-docdir \
+#	--disable-nls || err=1
+
 make -j${JOBS} || err=1
 check_err "Error building gcc support libraries!!"
 make install || err=1
