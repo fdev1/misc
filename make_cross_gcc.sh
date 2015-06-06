@@ -11,7 +11,7 @@ LINUX_ARCH=i386
 
 print_msg()
 {
-	echo -e "$BULLET $1"
+	echo -e "$BULLET $1..."
 	echo -ne "\033]0;$1\007"
 }
 
@@ -154,7 +154,7 @@ mkdir -p $PREFIX || err=1
 check_err "Unable to create/access target directory!"
 
 if [ 1 == 1 ]; then
-print_msg "Cleaning up build directories..."
+print_msg "Cleaning up build directories"
 rm -rf gcc-${GCC_VER}
 rm -rf binutils-2.24
 rm -rf glibc-2.20
@@ -174,7 +174,7 @@ untar distfiles/linux-3.18.14.tar.xz || err=1
 [ $err == 1 ] && exit -1
 fi
 
-print_msg "Compiling binutils..."
+print_msg "Compiling GNU Binutils"
 mkdir -p build-binutils
 cd build-binutils
 ../binutils-2.24/configure \
@@ -192,7 +192,7 @@ check_err "Error installing binutils..."
 cd ..
 
 if [ 1 == 1 ]; then
-print_msg "Installing Linux headers..."
+print_msg "Installing Linux headers"
 cd linux-3.18.14
 make ARCH=${LINUX_ARCH} INSTALL_HDR_PATH=${PREFIX} headers_install
 mkdir -p ${PREFIX}/usr
@@ -201,7 +201,7 @@ mkdir -p ${PREFIX}/usr
 check_err "Could not create ${PREFIX}/usr/include symlink!!"
 cd ..
 
-print_msg "Preparing GCC..."
+print_msg "Preparing GCC"
 mv gmp-6.0.0 gcc-${GCC_VER}/gmp
 mv mpc-1.0.3 gcc-${GCC_VER}/mpc
 mv mpfr-3.1.2 gcc-${GCC_VER}/mpfr
@@ -210,7 +210,7 @@ sed -i '/k prot/agcc_cv_libc_provides_ssp=yes' gcc/configure || err=1
 check_err "Error preparing gcc..."
 cd ..
 
-print_msg "Configuring GCC..."
+print_msg "Configuring GCC (Stage 1)"
 mkdir -p build-gcc
 cd build-gcc
 ../gcc-4.8.4/configure \
@@ -220,19 +220,6 @@ cd build-gcc
 	--with-sysroot=$PREFIX \
 	--without-docdir \
 	--disable-nls || err=1
-
-#../gcc-4.8.4/configure \
-#	--target=$TARGET \
-#	--prefix=$PREFIX \
-#	--enable-languages=c,c++ \
-#	--disable-libmudflap \
-#	--with-headers=$PREFIX/include \
-#	--with-native-system-header-dir=$PREFIX/include \
-#	--without-docdir \
-#	--disable-nls || err=1
-#
-
-
 check_err "Error configuring GCC!!"
 print_msg "Compiling GCC..."
 make all-gcc || err=1
@@ -241,7 +228,7 @@ make install-gcc || err=1
 check_err "Error installing GCC!!"
 cd ..
 
-print_msg "Configuring glibc..."
+print_msg "Configuring GNU C Library"
 mkdir -p build-glibc
 cd build-glibc
 ../glibc-2.20/configure \
@@ -251,13 +238,13 @@ cd build-glibc
 	--enable-kernel=2.6.32 \
 	--with-headers=$PREFIX/include \
 	libc_cv_forced_unwind=yes || err=1
-check_err "Error configuring glibc..."
+check_err "Error configuring glibc."
 
-print_msg "Installing libc headers..."
+print_msg "Installing libc headers"
 make install-bootstrap-headers=yes install-headers || err=1
-check_err "Error installing glibc headers..."
+check_err "Error installing glibc headers"
 
-print_msg "Creating dummy startfiles..."
+print_msg "Creating dummy startfiles"
 echo "" | ${TARGET}-gcc -nostdlib -nostartfiles -r -o $PREFIX/${TARGET}/lib/crt1.o -xc - || err=1
 echo "" | ${TARGET}-gcc -nostdlib -nostartfiles -r -o $PREFIX/${TARGET}/lib/crti.o -xc - || err=1
 echo "" | ${TARGET}-gcc -nostdlib -nostartfiles -r -o $PREFIX/${TARGET}/lib/crtn.o -xc - || err=1
@@ -269,7 +256,7 @@ touch ${PREFIX}/include/gnu/stubs.h || err=1
 cd ..
 
 
-print_msg "Compiling libgcc..."
+print_msg "Compiling compiler support library"
 cd build-gcc
 make -j${JOBS} all-target-libgcc || err=1
 check_err "Error compiling libgcc..."
@@ -277,7 +264,7 @@ make install-target-libgcc || err=1
 check_err "Error installing libgcc..."
 cd ..
 
-print_msg "Compiling glibc..."
+print_msg "Compiling GNU C Library"
 cd build-glibc
 make -j${JOBS} || err=1
 check_err "Error building glibc!!"
@@ -286,7 +273,7 @@ check_err "Error installing glibc!!"
 cd ..
 fi
 
-print_msg "Compiling gcc support libraries..."
+print_msg "Compiling GCC (Stage 2)"
 cd build-gcc
 rm -rf *
 ../gcc-4.8.4/configure \
