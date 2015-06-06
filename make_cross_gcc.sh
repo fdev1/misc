@@ -3,11 +3,13 @@
 # http://preshing.com/20141119/how-to-build-a-gcc-cross-compiler/
 #
 
-PREFIX=/opt/gcc-i586
+PREFIX=
 TARGET=i586-pc-linux-gnu
 GCC_VER=4.8.4
 JOBS=2
-LINUX_ARCH=i386
+LINUX_ARCH=
+BULLET="\033[0;32m *\033[0m"
+REDBUL="\033[0;31m !!\033[0m"
 
 print_msg()
 {
@@ -83,7 +85,7 @@ dowget()
         #       wget -qc $1 2>&1 > /dev/null
         #else
         #fi
-        print_msg "Fetching $1..."
+        print_msg "Fetching $1"
         wget -c --progress=bar:force -c $1  2>&1 | \
                 "$SCRIPTPATH/make_cross_gcc.sh" --progress-filter
 }
@@ -122,7 +124,60 @@ case $(uname) in
 esac
 
 
+# parse arguments
+#
+while [ $# != 0 ]; do
+        case $1 in
+		--target=*)
+			TARGET=${1#*=}
+		;;
+		--jobs=*)
+			JOBS=${1#*=}
+		;;
+		--prefix=*)
+			PREFIX=${1#*=}
+		;;
+		--linux-arch=*)
+			LINUX_ARCH=${1#*=}
+		;;
+		*)
+			print_err "Invalid argument: $1!!"
+			exit -1
+		;;
+        esac
+        shift
+done
 
+# if no prefix was given use /opt/$TARGET
+#
+if [ "${PREFIX}" == "" ]; then
+	PREFIX=/opt/${TARGET}
+fi
+
+# make sure that the requested target is Linux
+#
+case $TARGET in
+	*-linux-*) ;;
+	*)
+		print_err "Invalid target!!"
+		print_err "This script can only build Linux compilers!!"
+		exit -1
+	;;
+esac
+
+# try to guess linux ARCH if no value was
+# provided
+#
+if [ "${LINUX_ARCH}" == "" ]; then
+	case $TARGET in
+		i[3-6]86-*)
+			LINUX_ARCH=i386
+		;;
+		x86_64-*)
+			LINUX_ARCH=x86_64
+		;;
+	esac
+fi
 
 SCRIPTPATH="$( cd $(dirname $0)/ ; pwd -P )"
 cd "$SCRIPTPATH"
@@ -131,10 +186,8 @@ cd "$SCRIPTPATH"
 err=0
 export PATH=$PREFIX/bin:$PATH
 
-BULLET="\033[0;32m *\033[0m"
-REDBUL="\033[0;31m !!\033[0m"
-
 print_msg "Target: ${TARGET}"
+print_msg "Linux ARCH: ${LINUX_ARCH}"
 print_msg "Prefix: ${PREFIX}"
 print_msg "Path: ${PATH}"
 print_msg "Jobs: ${JOBS}"
