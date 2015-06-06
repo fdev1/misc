@@ -4,7 +4,7 @@
 #
 
 PREFIX=
-TARGET=i586-pc-linux-gnu
+TARGET=$(gcc -dumpmachine)
 GCC_VER=4.8.4
 JOBS=2
 LINUX_ARCH=
@@ -140,6 +140,9 @@ while [ $# != 0 ]; do
 		--linux-arch=*)
 			LINUX_ARCH=${1#*=}
 		;;
+		--gcc-version=*)
+			GCC_VER=${1#*=}
+		;;
 		*)
 			print_err "Invalid argument: $1!!"
 			exit -1
@@ -186,6 +189,7 @@ cd "$SCRIPTPATH"
 err=0
 export PATH=$PREFIX/bin:$PATH
 
+print_msg "GCC Version: ${GCC_VER}"
 print_msg "Target: ${TARGET}"
 print_msg "Linux ARCH: ${LINUX_ARCH}"
 print_msg "Prefix: ${PREFIX}"
@@ -195,7 +199,7 @@ print_msg "Jobs: ${JOBS}"
 mkdir -p distfiles
 cd distfiles
 dowget http://ftp.gnu.org/gnu/binutils/binutils-2.24.tar.gz
-dowget http://ftp.gnu.org/gnu/gcc/gcc-4.8.4.tar.gz
+dowget http://ftp.gnu.org/gnu/gcc/gcc-${GCC_VER}/gcc-${GCC_VER}.tar.gz
 dowget https://gmplib.org/download/gmp/gmp-6.0.0a.tar.lz
 dowget http://www.mpfr.org/mpfr-current/mpfr-3.1.2.tar.xz
 dowget ftp://ftp.gnu.org/gnu/mpc/mpc-1.0.3.tar.gz
@@ -266,7 +270,7 @@ cd ..
 print_msg "Configuring GCC (Stage 1)"
 mkdir -p build-gcc
 cd build-gcc
-../gcc-4.8.4/configure \
+../gcc-${GCC_VER}/configure \
 	--target=$TARGET \
 	--prefix=$PREFIX \
 	--enable-languages=c,c++ \
@@ -328,8 +332,7 @@ fi
 
 print_msg "Compiling GCC (Stage 2)"
 cd build-gcc
-rm -rf *
-../gcc-4.8.4/configure \
+rm -rf ../gcc-${GCC_VER}/configure \
 	--target=$TARGET \
 	--prefix=$PREFIX \
 	--enable-languages=c,c++ \
