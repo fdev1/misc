@@ -262,7 +262,7 @@ print_msg "Preparing GCC"
 mv gmp-6.0.0 gcc-${GCC_VER}/gmp
 mv mpc-1.0.3 gcc-${GCC_VER}/mpc
 mv mpfr-3.1.2 gcc-${GCC_VER}/mpfr
-cd gcc-4.8.4
+cd gcc-${GCC_VER}
 sed -i '/k prot/agcc_cv_libc_provides_ssp=yes' gcc/configure || err=1
 check_err "Error preparing gcc..."
 cd ..
