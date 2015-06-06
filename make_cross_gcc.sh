@@ -154,7 +154,7 @@ done
 # if no prefix was given use /opt/$TARGET
 #
 if [ "${PREFIX}" == "" ]; then
-	PREFIX=/opt/${TARGET}
+	PREFIX=/opt/${TARGET}-${GCC_VER}
 fi
 
 # make sure that the requested target is Linux
