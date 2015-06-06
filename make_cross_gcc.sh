@@ -3,7 +3,7 @@
 # http://preshing.com/20141119/how-to-build-a-gcc-cross-compiler/
 #
 
-PREFIX=/home/fernan/gcc-i586
+PREFIX=/opt/gcc-i586
 TARGET=i586-pc-linux-gnu
 GCC_VER=4.8.4
 JOBS=2
@@ -181,9 +181,9 @@ cd build-binutils
 	--target=$TARGET \
 	--prefix=$PREFIX \
 	--with-sysroot \
+	--with-lib-path=$PREFIX/lib \
 	--disable-werror \
 	--disable-nls || err=1
-	#--with-lib-path=$PREFIX/lib \
 check_err "Error configuring binutils..."
 make || err=1
 check_err "Error conpiling binutils..."
@@ -213,24 +213,24 @@ cd ..
 print_msg "Configuring GCC..."
 mkdir -p build-gcc
 cd build-gcc
-#../gcc-4.8.4/configure \
-#	--target=$TARGET \
-#	--prefix=$PREFIX \
-#	--enable-languages=c,c++ \
-#	--with-sysroot=$PREFIX \
-#	--without-docdir \
-#	--disable-nls || err=1
-
 ../gcc-4.8.4/configure \
 	--target=$TARGET \
 	--prefix=$PREFIX \
 	--enable-languages=c,c++ \
-	--disable-libmudflap \
-	--with-headers=$PREFIX/include \
-	--with-native-system-header-dir=$PREFIX/include \
+	--with-sysroot=$PREFIX \
 	--without-docdir \
 	--disable-nls || err=1
 
+#../gcc-4.8.4/configure \
+#	--target=$TARGET \
+#	--prefix=$PREFIX \
+#	--enable-languages=c,c++ \
+#	--disable-libmudflap \
+#	--with-headers=$PREFIX/include \
+#	--with-native-system-header-dir=$PREFIX/include \
+#	--without-docdir \
+#	--disable-nls || err=1
+#
 
 
 check_err "Error configuring GCC!!"
@@ -288,16 +288,16 @@ fi
 
 print_msg "Compiling gcc support libraries..."
 cd build-gcc
-
-#../gcc-4.8.4/configure \
-#	--target=$TARGET \
-#	--prefix=$PREFIX \
-#	--enable-languages=c,c++ \
-#	--disable-libmudflap \
-#	--with-headers=$PREFIX/include \
-#	--with-native-system-header-dir=$PREFIX/include \
-#	--without-docdir \
-#	--disable-nls || err=1
+rm -rf *
+../gcc-4.8.4/configure \
+	--target=$TARGET \
+	--prefix=$PREFIX \
+	--enable-languages=c,c++ \
+	--disable-libmudflap \
+	--with-headers=$PREFIX/include \
+	--with-native-system-header-dir=$PREFIX/include \
+	--without-docdir \
+	--disable-nls || err=1
 
 make -j${JOBS} || err=1
 check_err "Error building gcc support libraries!!"
