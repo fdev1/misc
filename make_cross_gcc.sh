@@ -6,10 +6,12 @@
 PREFIX=
 TARGET=$(gcc -dumpmachine)
 GCC_VER=4.8.4
+MULTILIB_LIST=
 JOBS=2
 LINUX_ARCH=
 BULLET="\033[0;32m *\033[0m"
 REDBUL="\033[0;31m !!\033[0m"
+MULTILIB=0
 
 print_msg()
 {
@@ -98,6 +100,23 @@ untar()
 	return 0
 }
 
+print_usage()
+{
+	echo -e "$0 [options]"
+	echo
+	echo -e "Options:"
+	echo
+	echo -e "  --target=<target>\t\tThe target compiler triplet to build (e.g i386-pc-linux-gnu)"
+	echo -e "  --linux-arch=<arch>\t\tThe Linux ARCH value. The script will try to guess this."
+	echo -e "  --prefix=<prefix>\t\tThe directory where the new compiler will be installed."
+	echo -e "  --gcc-version=<version>\tThe GCC version to build."
+	echo -e "  --jobs=<jobs>\t\t\tThe number of concurrent build jobs."
+	echo -e "  --help\t\t\tDisplay this text."
+	echo
+	echo -e "Author: Fernando Rodriguez"
+	echo
+}
+
 if [ "$1" == "--progress-filter" ]; then
         progressfilt
         exit 0
@@ -143,6 +162,10 @@ while [ $# != 0 ]; do
 		--gcc-version=*)
 			GCC_VER=${1#*=}
 		;;
+		--help)
+			print_usage
+			exit 0
+		;;
 		*)
 			print_err "Invalid argument: $1!!"
 			exit -1
@@ -182,6 +205,26 @@ if [ "${LINUX_ARCH}" == "" ]; then
 	esac
 fi
 
+if [ "$MULTILIB_LIST" == "" ]; then
+	case $TARGET in
+		x86_64-*)
+			MULTILIB_LIST=m32,m64
+		;;
+	esac
+fi
+
+# Do we need multilib?
+#
+case $TARGET in 
+	x86_64-*)
+		case $MULTILIB_LIST in
+			*m64)
+				MULTILIB=1
+			;;
+		esac
+	;;
+esac
+
 SCRIPTPATH="$( cd $(dirname $0)/ ; pwd -P )"
 cd "$SCRIPTPATH"
 
@@ -191,6 +234,7 @@ export PATH=$PREFIX/bin:$PATH
 
 print_msg "GCC Version: ${GCC_VER}"
 print_msg "Target: ${TARGET}"
+print_msg "Multilib Support: ${MULTILIB_LIST}"
 print_msg "Linux ARCH: ${LINUX_ARCH}"
 print_msg "Prefix: ${PREFIX}"
 print_msg "Path: ${PATH}"
@@ -221,6 +265,31 @@ rm -rf build-glibc
 rm -rf linux-3.18.14
 rm -rf $PREFIX/*
 
+# create lib directories
+#
+#case $TARGET in 
+#	x86_64-*)
+#		case $MULTILIB_LIST in
+#			*m64)
+#				mkdir -p $PREFIX/lib32
+#				mkdir -p $PREFIX/lib64
+#				mkdir -p $PREFIX/$TARGET/lib32
+#				mkdir -p $PREFIX/$TARGET/lib64
+#				ln -s $PREFIX/lib64 $PREFIX/$TARGET/lib
+#				ln -s $PREFIX/$TARGET/lib64 $PREFIX/$TARGET/lib
+#			;;
+#			*)
+#				mkdir -p $PREFIX/lib
+#			;;
+#		esac
+#	;;
+#	*)
+#		mkdir -p $PREFIX/lib
+#	;;
+#esac
+
+
+
 untar distfiles/binutils-2.24.tar.gz || err=1
 untar distfiles/gcc-${GCC_VER}.tar.gz || err=1
 untar distfiles/gmp-6.0.0a.tar.lz || err=1
@@ -238,9 +307,12 @@ cd build-binutils
 	--target=$TARGET \
 	--prefix=$PREFIX \
 	--with-sysroot \
-	--with-lib-path=$PREFIX/lib \
+	--with-lib-path="$PREFIX/lib $PREFIX/lib64 $PREFIX/lib32" \
+	--enable-64-bit-bfd \
+	--enable-multilib \
 	--disable-werror \
 	--disable-nls || err=1
+	#--enable-targets=all \
 check_err "Error configuring binutils..."
 make || err=1
 check_err "Error conpiling binutils..."
@@ -275,14 +347,18 @@ cd build-gcc
 	--prefix=$PREFIX \
 	--enable-languages=c,c++ \
 	--with-sysroot=$PREFIX \
+	--with-newlib \
+	--enable-targets=all \
+	--with-multilib-list=${MULTILIB_LIST} \
+	--enable-multilib \
 	--without-docdir \
 	--disable-nls || err=1
-check_err "Error configuring GCC!!"
-print_msg "Compiling GCC..."
+check_err "Error configuring GCC (Stage 1)!!"
+print_msg "Compiling GCC (Stage 1)..."
 make all-gcc || err=1
-check_err "Error building GCC!!"
+check_err "Error building GCC (Stage 1)!!"
 make install-gcc || err=1
-check_err "Error installing GCC!!"
+check_err "Error installing GCC (Stage 1)!!"
 cd ..
 
 print_msg "Configuring GNU C Library"
@@ -301,17 +377,34 @@ print_msg "Installing libc headers"
 make install-bootstrap-headers=yes install-headers || err=1
 check_err "Error installing glibc headers"
 
-print_msg "Creating dummy startfiles"
-echo "" | ${TARGET}-gcc -nostdlib -nostartfiles -r -o $PREFIX/${TARGET}/lib/crt1.o -xc - || err=1
-echo "" | ${TARGET}-gcc -nostdlib -nostartfiles -r -o $PREFIX/${TARGET}/lib/crti.o -xc - || err=1
-echo "" | ${TARGET}-gcc -nostdlib -nostartfiles -r -o $PREFIX/${TARGET}/lib/crtn.o -xc - || err=1
-echo "" | ${TARGET}-gcc -nostdlib -nostartfiles -shared -o $PREFIX/lib/libc.so -xc - || err=1
-check_err "Error creating dummy startfiles..."
+if [ $MULTILIB == 1 ]; then
+	mkdir -p $PREFIX/$TARGET/lib32
+	mkdir -p $PREFIX/lib32
+	print_msg "Creating dummy startfiles"
+	echo "" | ${TARGET}-gcc -nostdlib -nostartfiles -r -o $PREFIX/${TARGET}/lib/crt1.o -xc - || err=1
+	echo "" | ${TARGET}-gcc -nostdlib -nostartfiles -r -o $PREFIX/${TARGET}/lib/crti.o -xc - || err=1
+	echo "" | ${TARGET}-gcc -nostdlib -nostartfiles -r -o $PREFIX/${TARGET}/lib/crtn.o -xc - || err=1
+	echo "" | ${TARGET}-gcc -nostdlib -nostartfiles -shared -o $PREFIX/lib/libc.so -xc - || err=1
+	check_err "Error creating dummy startfiles..."
+
+	echo "" | ${TARGET}-gcc -m32 -nostdlib -nostartfiles -r -o $PREFIX/${TARGET}/lib32/crt1.o -xc - || err=1
+	echo "" | ${TARGET}-gcc -m32 -nostdlib -nostartfiles -r -o $PREFIX/${TARGET}/lib32/crti.o -xc - || err=1
+	echo "" | ${TARGET}-gcc -m32 -nostdlib -nostartfiles -r -o $PREFIX/${TARGET}/lib32/crtn.o -xc - || err=1
+	echo "" | ${TARGET}-gcc -m32 -nostdlib -nostartfiles -shared -o $PREFIX/lib32/libc.so -xc - || err=1
+	check_err "Error creating dummy startfiles (64 bits)..."
+else
+	print_msg "Creating dummy startfiles"
+	echo "" | ${TARGET}-gcc -nostdlib -nostartfiles -r -o $PREFIX/${TARGET}/lib/crt1.o -xc - || err=1
+	echo "" | ${TARGET}-gcc -nostdlib -nostartfiles -r -o $PREFIX/${TARGET}/lib/crti.o -xc - || err=1
+	echo "" | ${TARGET}-gcc -nostdlib -nostartfiles -r -o $PREFIX/${TARGET}/lib/crtn.o -xc - || err=1
+	echo "" | ${TARGET}-gcc -nostdlib -nostartfiles -shared -o $PREFIX/lib/libc.so -xc - || err=1
+	check_err "Error creating dummy startfiles..."
+fi
 
 touch ${PREFIX}/include/gnu/stubs.h || err=1
 [ $err == 1 ] && exit -1
 cd ..
-
+fi
 
 print_msg "Compiling compiler support library"
 cd build-gcc
@@ -328,13 +421,14 @@ check_err "Error building glibc!!"
 make install || err=1
 check_err "Error installing glibc!!"
 cd ..
-fi
 
 print_msg "Compiling GCC (Stage 2)"
 cd build-gcc
 rm -rf ../gcc-${GCC_VER}/configure \
 	--target=$TARGET \
 	--prefix=$PREFIX \
+	--with-multilib-list=${MULTILIB_LIST} \
+	--enable-targets=all \
 	--enable-languages=c,c++ \
 	--disable-libmudflap \
 	--with-headers=$PREFIX/include \
@@ -343,9 +437,9 @@ rm -rf ../gcc-${GCC_VER}/configure \
 	--disable-nls || err=1
 
 make -j${JOBS} || err=1
-check_err "Error building gcc support libraries!!"
+check_err "Error building GCC (Stage 2)!!"
 make install || err=1
-check_err "Error installing gcc support libraries!!"
+check_err "Error installing GCC (Stage 2)!!"
 cd ..
 
 print_msg "GCC (${TARGET}) built successfully."
