@@ -339,8 +339,17 @@ if [ $BUILD_DEPS == 1 ]; then
 	mv mpc-1.0.3 gcc-${GCC_VER}/mpc
 	mv mpfr-3.1.2 gcc-${GCC_VER}/mpfr
 fi
+
 cd gcc-${GCC_VER}
 sed -i '/k prot/agcc_cv_libc_provides_ssp=yes' gcc/configure || err=1
+
+if [ $MULTILIB == 1 ]; then
+	sed -i -e "s@/libx32/ld-linux-x32.so.2@${PREFIX}/libx32/ld-linux-x32.so.2@g" gcc/config/i386/linux64.h
+	sed -i -e 's@/lib/ld-linux.so.2@/lib32/ld-linux.so.2@g' gcc/config/i386/linux64.h
+	sed -i -e '/MULTILIB_OSDIRNAMES/d' gcc/config/i386/t-linux64
+	echo "MULTILIB_OSDIRNAMES = m64=../lib m32=../lib32 mx32=../libx32" >> gcc/config/i386/t-linux64
+fi
+
 check_err "Error preparing gcc..."
 cd ..
 
