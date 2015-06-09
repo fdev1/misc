@@ -352,12 +352,12 @@ cd build-gcc
 	--prefix=$PREFIX \
 	--enable-languages=c,c++ \
 	--with-sysroot=$PREFIX \
-	--with-newlib \
 	--with-multilib-list=${MULTILIB_LIST} \
 	--enable-multilib \
 	--without-docdir \
 	--disable-nls || err=1
 	#--enable-targets=all \
+	#--with-newlib \
 check_err "Error configuring GCC (Stage 1)!!"
 print_msg "Compiling GCC (Stage 1)..."
 make -j${JOBS} all-gcc || err=1
