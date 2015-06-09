@@ -311,7 +311,7 @@ cd build-binutils
 	--target=$TARGET \
 	--prefix=$PREFIX \
 	--with-sysroot \
-	--with-lib-path="$PREFIX/lib:$PREFIX/lib64:$PREFIX/lib32" \
+	--with-lib-path=${PREFIX}/lib:${PREFIX}/lib32 \
 	--enable-64-bit-bfd \
 	--enable-multilib \
 	--disable-werror \
@@ -346,12 +346,12 @@ fi
 cd gcc-${GCC_VER}
 sed -i '/k prot/agcc_cv_libc_provides_ssp=yes' gcc/configure || err=1
 
-#if [ $MULTILIB == 1 ]; then
-#	sed -i -e "s@/libx32/ld-linux-x32.so.2@${PREFIX}/libx32/ld-linux-x32.so.2@g" gcc/config/i386/linux64.h
-#	sed -i -e 's@/lib/ld-linux.so.2@/lib32/ld-linux.so.2@g' gcc/config/i386/linux64.h
-#	sed -i -e '/MULTILIB_OSDIRNAMES/d' gcc/config/i386/t-linux64
-#	echo "MULTILIB_OSDIRNAMES = m64=../lib m32=../lib32 mx32=../libx32" >> gcc/config/i386/t-linux64
-#fi
+if [ $MULTILIB == 1 ]; then
+	#sed -i -e "s@/libx32/ld-linux-x32.so.2@${PREFIX}/libx32/ld-linux-x32.so.2@g" gcc/config/i386/linux64.h
+	#sed -i -e 's@/lib/ld-linux.so.2@/lib32/ld-linux.so.2@g' gcc/config/i386/linux64.h
+	sed -i -e '/MULTILIB_OSDIRNAMES/d' gcc/config/i386/t-linux64
+	echo "MULTILIB_OSDIRNAMES = m64=../lib m32=../lib32 mx32=../libx32" >> gcc/config/i386/t-linux64
+fi
 
 check_err "Error preparing gcc..."
 cd ..
