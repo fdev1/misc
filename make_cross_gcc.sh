@@ -332,8 +332,8 @@ mkdir -p ${PREFIX}/usr
 	(ln -fs ${PREFIX}/include ${PREFIX}/usr/include || err=1)
 check_err "Could not create ${PREFIX}/usr/include symlink!!"
 mkdir -p $PREFIX/include/gnu
-#touch ${PREFIX}/include/gnu/stubs.h || err=1
-#[ $err == 1 ] && exit -1
+touch ${PREFIX}/include/gnu/stubs.h || err=1
+[ $err == 1 ] && exit -1
 cd ..
 
 print_msg "Preparing GCC"
@@ -363,11 +363,14 @@ cd build-gcc
 	--target=$TARGET \
 	--prefix=$PREFIX \
 	--enable-languages=c,c++ \
-	--with-sysroot=$PREFIX \
+	--with-local-prefix=${PREFIX} \
+	--with-native-system-header-dir=${PREFIX}/include \
 	--with-multilib-list=${MULTILIB_LIST} \
+	--enable-multiarch \
 	--enable-multilib \
 	--without-docdir \
 	--disable-nls || err=1
+	#--with-sysroot=$PREFIX \
 	#--enable-targets=all \
 	#--with-newlib \
 check_err "Error configuring GCC (Stage 1)!!"
