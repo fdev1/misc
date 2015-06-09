@@ -12,6 +12,7 @@ LINUX_ARCH=
 BULLET="\033[0;32m *\033[0m"
 REDBUL="\033[0;31m !!\033[0m"
 MULTILIB=0
+BUILD_DEPS=0
 
 print_msg()
 {
@@ -244,9 +245,11 @@ mkdir -p distfiles
 cd distfiles
 dowget http://ftp.gnu.org/gnu/binutils/binutils-2.24.tar.gz
 dowget http://ftp.gnu.org/gnu/gcc/gcc-${GCC_VER}/gcc-${GCC_VER}.tar.gz
-dowget https://gmplib.org/download/gmp/gmp-6.0.0a.tar.lz
-dowget http://www.mpfr.org/mpfr-current/mpfr-3.1.2.tar.xz
-dowget ftp://ftp.gnu.org/gnu/mpc/mpc-1.0.3.tar.gz
+if [ $BUILD_DEPS == 1  ]; then
+	dowget https://gmplib.org/download/gmp/gmp-6.0.0a.tar.lz
+	dowget http://www.mpfr.org/mpfr-current/mpfr-3.1.2.tar.xz
+	dowget ftp://ftp.gnu.org/gnu/mpc/mpc-1.0.3.tar.gz
+fi
 dowget http://ftp.gnu.org/gnu/glibc/glibc-2.20.tar.xz
 dowget https://www.kernel.org/pub/linux/kernel/v3.x/linux-3.18.14.tar.xz
 cd ..
@@ -292,13 +295,14 @@ rm -rf $PREFIX/*
 
 untar distfiles/binutils-2.24.tar.gz || err=1
 untar distfiles/gcc-${GCC_VER}.tar.gz || err=1
-untar distfiles/gmp-6.0.0a.tar.lz || err=1
-untar distfiles/mpc-1.0.3.tar.gz || err=1
-untar distfiles/mpfr-3.1.2.tar.xz || err=1
+if [ $BUILD_DEPS == 1 ]; then
+	untar distfiles/gmp-6.0.0a.tar.lz || err=1
+	untar distfiles/mpc-1.0.3.tar.gz || err=1
+	untar distfiles/mpfr-3.1.2.tar.xz || err=1
+fi
 untar distfiles/glibc-2.20.tar.xz || err=1
 untar distfiles/linux-3.18.14.tar.xz || err=1
 [ $err == 1 ] && exit -1
-fi
 
 print_msg "Compiling GNU Binutils"
 mkdir -p build-binutils
@@ -307,20 +311,19 @@ cd build-binutils
 	--target=$TARGET \
 	--prefix=$PREFIX \
 	--with-sysroot \
-	--with-lib-path="$PREFIX/lib $PREFIX/lib64 $PREFIX/lib32" \
+	--with-lib-path="$PREFIX/lib:$PREFIX/lib64:$PREFIX/lib32" \
 	--enable-64-bit-bfd \
 	--enable-multilib \
 	--disable-werror \
 	--disable-nls || err=1
 	#--enable-targets=all \
 check_err "Error configuring binutils..."
-make || err=1
+make -j${JOBS} || err=1
 check_err "Error conpiling binutils..."
 make install || err=1
 check_err "Error installing binutils..."
 cd ..
 
-if [ 1 == 1 ]; then
 print_msg "Installing Linux headers"
 cd linux-3.18.14
 make ARCH=${LINUX_ARCH} INSTALL_HDR_PATH=${PREFIX} headers_install
@@ -331,9 +334,11 @@ check_err "Could not create ${PREFIX}/usr/include symlink!!"
 cd ..
 
 print_msg "Preparing GCC"
-mv gmp-6.0.0 gcc-${GCC_VER}/gmp
-mv mpc-1.0.3 gcc-${GCC_VER}/mpc
-mv mpfr-3.1.2 gcc-${GCC_VER}/mpfr
+if [ $BUILD_DEPS == 1 ]; then
+	mv gmp-6.0.0 gcc-${GCC_VER}/gmp
+	mv mpc-1.0.3 gcc-${GCC_VER}/mpc
+	mv mpfr-3.1.2 gcc-${GCC_VER}/mpfr
+fi
 cd gcc-${GCC_VER}
 sed -i '/k prot/agcc_cv_libc_provides_ssp=yes' gcc/configure || err=1
 check_err "Error preparing gcc..."
@@ -348,18 +353,19 @@ cd build-gcc
 	--enable-languages=c,c++ \
 	--with-sysroot=$PREFIX \
 	--with-newlib \
-	--enable-targets=all \
 	--with-multilib-list=${MULTILIB_LIST} \
 	--enable-multilib \
 	--without-docdir \
 	--disable-nls || err=1
+	#--enable-targets=all \
 check_err "Error configuring GCC (Stage 1)!!"
 print_msg "Compiling GCC (Stage 1)..."
-make all-gcc || err=1
+make -j${JOBS} all-gcc || err=1
 check_err "Error building GCC (Stage 1)!!"
 make install-gcc || err=1
 check_err "Error installing GCC (Stage 1)!!"
 cd ..
+fi
 
 print_msg "Configuring GNU C Library"
 mkdir -p build-glibc
@@ -381,10 +387,10 @@ if [ $MULTILIB == 1 ]; then
 	mkdir -p $PREFIX/$TARGET/lib32
 	mkdir -p $PREFIX/lib32
 	print_msg "Creating dummy startfiles"
-	echo "" | ${TARGET}-gcc -nostdlib -nostartfiles -r -o $PREFIX/${TARGET}/lib/crt1.o -xc - || err=1
-	echo "" | ${TARGET}-gcc -nostdlib -nostartfiles -r -o $PREFIX/${TARGET}/lib/crti.o -xc - || err=1
-	echo "" | ${TARGET}-gcc -nostdlib -nostartfiles -r -o $PREFIX/${TARGET}/lib/crtn.o -xc - || err=1
-	echo "" | ${TARGET}-gcc -nostdlib -nostartfiles -shared -o $PREFIX/lib/libc.so -xc - || err=1
+	echo "" | ${TARGET}-gcc -m64 -nostdlib -nostartfiles -r -o $PREFIX/${TARGET}/lib/crt1.o -xc - || err=1
+	echo "" | ${TARGET}-gcc -m64 -nostdlib -nostartfiles -r -o $PREFIX/${TARGET}/lib/crti.o -xc - || err=1
+	echo "" | ${TARGET}-gcc -m64 -nostdlib -nostartfiles -r -o $PREFIX/${TARGET}/lib/crtn.o -xc - || err=1
+	echo "" | ${TARGET}-gcc -m64 -nostdlib -nostartfiles -shared -o $PREFIX/lib/libc.so -xc - || err=1
 	check_err "Error creating dummy startfiles..."
 
 	echo "" | ${TARGET}-gcc -m32 -nostdlib -nostartfiles -r -o $PREFIX/${TARGET}/lib32/crt1.o -xc - || err=1
@@ -404,7 +410,6 @@ fi
 touch ${PREFIX}/include/gnu/stubs.h || err=1
 [ $err == 1 ] && exit -1
 cd ..
-fi
 
 print_msg "Compiling compiler support library"
 cd build-gcc
