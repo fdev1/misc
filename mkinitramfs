@@ -30,7 +30,7 @@ copy_firmware=0
 overlay=""
 pango_support=1
 plymouth_support=1
-uswsusp_support=0
+uswsusp_support=1
 swsusp_support=1
 compress_method="xz"
 
@@ -137,8 +137,9 @@ mkdir -p $output_dir/dev/shm || last_error=1
 mkdir -p $output_dir/proc || last_error=1
 mkdir -p $output_dir/sys || last_error=1
 mkdir -p $output_dir/run || last_error=1
-mkdir -p $output_dir/tmp || last_error=1
 mkdir -p $output_dir/var || last_error=1
+mkdir -p $output_dir/var/log || last_error=1
+mkdir -p $output_dir/tmp || last_error=1
 mkdir -p $output_dir/newroot || last_error=1
 mkdir -p $output_dir/newroot/run
 mkdir -p $output_dir/newroot/dev
@@ -164,8 +165,8 @@ error_check
 # creating fstab
 #
 display_msg 'Creating fstab...'
-echo "/dev/ram0     /           ext2    defaults    0 0" >  $output_dir/etc/fstab
-echo "proc          /proc       proc    defaults    0 0" >> $output_dir/etc/fstab
+echo "/dev/ram0     /           ext2     defaults    0 0" >  $output_dir/etc/fstab
+echo "proc          /proc       proc     defaults    0 0" >> $output_dir/etc/fstab
 
 #
 # copy busybox files
@@ -177,6 +178,8 @@ ln -s busybox $output_dir/bin/mount || last_error=1
 ln -s busybox $output_dir/bin/sh || last_error=1
 ln -s busybox $output_dir/bin/echo || last_error=1
 ln -s busybox $output_dir/bin/sleep || last_error=1
+ln -s busybox $output_dir/bin/mv || last_error=1
+ln -s busybox $output_dir/bin/touch || last_error=1
 ln -s /bin/busybox $output_dir/sbin/switch_root || last_error=1
 error_check
 
@@ -214,7 +217,11 @@ if [ $plymouth_support == 1 ]; then
 	cp /usr/lib/plymouth/label.so $output_dir/usr/lib/plymouth
 	cp /usr/lib/plymouth/details.so $output_dir/usr/lib/plymouth
 	cp /usr/lib/plymouth/renderers/frame-buffer.so $output_dir/usr/lib/plymouth/renderers
-	cp /usr/lib/plymouth/renderers/drm.so $output_dir/usr/lib/plymouth/renderers
+	#cp /usr/lib/plymouth/renderers/drm.so $output_dir/usr/lib/plymouth/renderers
+	#cp /usr/lib/plymouth/renderers/x11.so $output_dir/usr/lib/plymouth/renderers
+
+	cp /usr/lib/libdrm_radeon.so.1 $output_dir/usr/lib
+	
 
 	#cp /usr/share/plymouth/bizcom.png $output_dir/usr/share/plymouth
 	cp /usr/share/plymouth/plymouthd.defaults $output_dir/usr/share/plymouth
@@ -255,7 +262,7 @@ if [ $pango_support == 1 ]; then
 	cp /usr/lib/libpangoft2-1.0.so.0 $output_dir/usr/lib
 	cp /usr/lib/libglib-2.0.so.0 $output_dir/usr/lib
 	cp /usr/lib/libfreetype.so.6 $output_dir/usr/lib
-	cp /usr/lib/libfontconfig.so.1 $output_dir/usr/lib
+	cp /usr/lib/libfontconfig.so.1 $output_dir/usr/lb
 	cp /usr/lib/libgmodule-2.0.so.0 $output_dir/usr/lib
 	cp /usr/lib/libffi.so.6 $output_dir/usr/lib
 	cp /usr/lib/libpixman-1.so.0 $output_dir/usr/lib
@@ -280,6 +287,16 @@ if [ $pango_support == 1 ]; then
 	cp /usr/lib/libgraphite2.so.3 $output_dir/usr/lib
 	cp /usr/lib/libglapi.so.0 $output_dir/usr/lib
 	cp /usr/lib/libxcb-shape.so.0 $output_dir/usr/lib
+	#cp /usr/lib/libXdamage.so.1 $output_dir/usr/lib
+	#cp /usr/lib/libXfixes.so.3 $output_dir/usr/lib
+	#cp /usr/lib/libxcb-dri3.so.0 $output_dir/usr/lib
+	#cp /usr/lib/libxcb-glx.so.0 $output_dir/usr/lib
+	#cp /usr/lib/libxcb-present.so.0 $output_dir/usr/lib
+	#cp /usr/lib/libxcb-randr.so.0 $output_dir/usr/lib
+	#cp /usr/lib/libxcb-sync.so.1 $output_dir/usr/lib
+	#cp /usr/lib/libxshmfence.so.1 $output_dir/usr/lib
+	#cp /usr/lib/libXxf86vm.so.1 $output_dir/usr/lib
+
 
 	mkdir -p $output_dir/usr/lib/pango/1.8.0/modules
 	mkdir -p $output_dir/usr/share/fonts/dejavu
@@ -367,12 +384,12 @@ if [ $plymouth_support == 1 ]; then
 	cat >> $output_dir/init << "EOF"
 	plymouth_start()
 	{
-		if [ $show_splash == 1 ]; then
-			#mkdir -p /run/plymouth
-			#plymouthd --attach-to-session --pid-file /run/plymouth/pid --mode=shutdown --kernel-command-line="splash"
-			plymouthd --mode=shutdown --kernel-command-line="splash"
-			plymouth --show-splash
-		fi
+		#mkdir -p /run/plymouth
+		#plymouthd --attach-to-session --pid-file /run/plymouth/pid --mode=shutdown --kernel-command-line="splash"
+		#touch /tmp/plymouth.log
+		plymouthd --mode=shutdown --kernel-command-line="splash"
+		#plymouthd --mode=boot --pid-file=/run/plymouth/pid
+		plymouth show-splash
 	}
 
 	plymouth_set_message()
@@ -415,6 +432,7 @@ swsusp_resume=""
 mount -t proc -o noexec,nosuid,nodev proc /proc >/dev/null 2>&1
 mount -o remount,rw / >/dev/null 2>&1
 mount -t tmpfs -o rw,nosuid,nodev,relatime,mode=755 none /run 2>&1
+mount -t tmpfs -o rw,nosuid,nodev,relatime,mode=755 none /dev/shm 2>&1
 
 # mount devfs
 #
@@ -429,6 +447,8 @@ error_check
 #
 mount -t sysfs sysfs /sys -o noexec,nosuid,nodev > /dev/null 2>&1 || last_error=1
 error_check
+
+#/bin/sh
 
 # parse command line
 #
@@ -489,6 +509,10 @@ if [ $plymouth_support == 1 ]; then
 	# start plymouthd and show splash screen
 	#
 	plymouth_start
+	#plymouth update-root-fs
+	#plymouth quit
+	#/bin/sh
+
 EOF
 fi
 
@@ -496,6 +520,7 @@ fi
 
 if [ $swsusp_support == 1 ] && [ $plymouth_support == 1 ]; then
 
+	#plymouth_support=0
 	cat >> $output_dir/init << "EOF"
 
 	# Resume using swsusp
@@ -506,9 +531,11 @@ if [ $swsusp_support == 1 ] && [ $plymouth_support == 1 ]; then
 		echo "$swsusp_resume" > /sys/power/resume
 		plymouth_set_boot_mode
 		plymouth_set_message "Booting System..."
+		#plymouth --quit --retain-splash
 	else
 		plymouth_set_boot_mode
 		plymouth_set_message "Booting System..."
+		#plymouth --quit --retain-splash
 	fi
 
 EOF
@@ -546,20 +573,6 @@ cat >> $output_dir/init << "EOF"
 #
 mount -o ro $fake_root /newroot
 
-EOF
-
-if [ $plymouth_support == 1 ]; then
-	cat >> $output_dir/init << "EOF"
-	# inform plymouth of new root
-	#
-	if [ $show_splash == 1 ]; then
-		plymouth --newroot=/newroot
-	fi
-
-EOF
-fi
-
-cat >> $output_dir/init << "EOF"
 # move virtual filesystems to new root
 #
 mount --move /run /newroot/run
@@ -567,9 +580,31 @@ mount --move /dev /newroot/dev
 mount --move /sys /newroot/sys
 mount --move /proc /newroot/proc
 
+EOF
+
+if [ $plymouth_support == 1 ]; then
+	cat >> $output_dir/init << "EOF"
+	# inform plymouth of new root
+	#
+	#if [ $show_splash == 1 ]; then
+	#	plymouth --newroot=/newroot
+	#fi
+	#plymouth hide-splash
+	#/bin/sh
+	#mv /tmp/plymouth.log /newroot/var/log/plymouth.log
+	plymouth --newroot=/newroot
+	if [ $show_splash == 0 ]; then
+		plymouth hide-splash
+	fi
+
+EOF
+fi
+
+cat >> $output_dir/init << "EOF"
+
 # switch to new root
 #
-exec /sbin/switch_root -c /dev/console /newroot /sbin/init "$init_opts"
+exec /sbin/switch_root -c /dev/console /newroot /usr/lib/systemd/systemd "$init_opts"
 
 #
 # If we get here, something bad has happened
