@@ -1,0 +1,8 @@
+a.out
+distfiles/*
+initramfs.img
+mkinitramfs.bak
+*.save
+*.save.*
+config.bak
+
