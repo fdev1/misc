@@ -30,7 +30,7 @@ copy_firmware=0
 overlay=""
 pango_support=1
 plymouth_support=1
-uswsusp_support=1
+uswsusp_support=0
 swsusp_support=1
 compress_method="xz"
 
@@ -262,7 +262,7 @@ if [ $pango_support == 1 ]; then
 	cp /usr/lib/libpangoft2-1.0.so.0 $output_dir/usr/lib
 	cp /usr/lib/libglib-2.0.so.0 $output_dir/usr/lib
 	cp /usr/lib/libfreetype.so.6 $output_dir/usr/lib
-	cp /usr/lib/libfontconfig.so.1 $output_dir/usr/lb
+	cp /usr/lib/libfontconfig.so.1 $output_dir/usr/lib
 	cp /usr/lib/libgmodule-2.0.so.0 $output_dir/usr/lib
 	cp /usr/lib/libffi.so.6 $output_dir/usr/lib
 	cp /usr/lib/libpixman-1.so.0 $output_dir/usr/lib
@@ -287,16 +287,15 @@ if [ $pango_support == 1 ]; then
 	cp /usr/lib/libgraphite2.so.3 $output_dir/usr/lib
 	cp /usr/lib/libglapi.so.0 $output_dir/usr/lib
 	cp /usr/lib/libxcb-shape.so.0 $output_dir/usr/lib
-	#cp /usr/lib/libXdamage.so.1 $output_dir/usr/lib
-	#cp /usr/lib/libXfixes.so.3 $output_dir/usr/lib
-	#cp /usr/lib/libxcb-dri3.so.0 $output_dir/usr/lib
-	#cp /usr/lib/libxcb-glx.so.0 $output_dir/usr/lib
-	#cp /usr/lib/libxcb-present.so.0 $output_dir/usr/lib
-	#cp /usr/lib/libxcb-randr.so.0 $output_dir/usr/lib
-	#cp /usr/lib/libxcb-sync.so.1 $output_dir/usr/lib
-	#cp /usr/lib/libxshmfence.so.1 $output_dir/usr/lib
-	#cp /usr/lib/libXxf86vm.so.1 $output_dir/usr/lib
-
+	cp /usr/lib/libXdamage.so.1 $output_dir/usr/lib
+	cp /usr/lib/libXfixes.so.3 $output_dir/usr/lib
+	cp /usr/lib/libxcb-dri3.so.0 $output_dir/usr/lib
+	cp /usr/lib/libxcb-glx.so.0 $output_dir/usr/lib
+	cp /usr/lib/libxcb-present.so.0 $output_dir/usr/lib
+	cp /usr/lib/libxcb-randr.so.0 $output_dir/usr/lib
+	cp /usr/lib/libxcb-sync.so.1 $output_dir/usr/lib
+	cp /usr/lib/libxshmfence.so.1 $output_dir/usr/lib
+	cp /usr/lib/libXxf86vm.so.1 $output_dir/usr/lib
 
 	mkdir -p $output_dir/usr/lib/pango/1.8.0/modules
 	mkdir -p $output_dir/usr/share/fonts/dejavu
@@ -384,20 +383,29 @@ if [ $plymouth_support == 1 ]; then
 	cat >> $output_dir/init << "EOF"
 	plymouth_start()
 	{
-		#mkdir -p /run/plymouth
-		#plymouthd --attach-to-session --pid-file /run/plymouth/pid --mode=shutdown --kernel-command-line="splash"
-		#touch /tmp/plymouth.log
-		plymouthd --mode=shutdown --kernel-command-line="splash"
-		#plymouthd --mode=boot --pid-file=/run/plymouth/pid
-		plymouth show-splash
+		if [ $show_splash == 1 ]; then
+			plymouthd --mode=shutdown --kernel-command-line="splash"
+		fi
+	}
+
+	plymouth_show()
+	{
+		if [ $show_splash == 1 ]; then
+			plymouth show-splash
+		fi
 	}
 
 	plymouth_set_message()
 	{
-		#plymouth display-message --text=msg
-		#plymouth display-message --text="$1"
 		plymouth update --status=msg
 		plymouth update --status="$1"
+	}
+
+	plymouth_set_quiet()
+	{
+		if [ $quiet == 1 ]; then
+			plymouth update --status=set-quiet
+		fi
 	}
 
 	plymouth_set_boot_mode()
@@ -509,10 +517,8 @@ if [ $plymouth_support == 1 ]; then
 	# start plymouthd and show splash screen
 	#
 	plymouth_start
-	#plymouth update-root-fs
-	#plymouth quit
-	#/bin/sh
-
+	plymouth_show
+	plymouth_set_quiet
 EOF
 fi
 
@@ -530,12 +536,12 @@ if [ $swsusp_support == 1 ] && [ $plymouth_support == 1 ]; then
 		sleep 0.25
 		echo "$swsusp_resume" > /sys/power/resume
 		plymouth_set_boot_mode
+		plymouth_set_quiet
 		plymouth_set_message "Booting System..."
-		#plymouth --quit --retain-splash
 	else
 		plymouth_set_boot_mode
+		plymouth_set_quiet
 		plymouth_set_message "Booting System..."
-		#plymouth --quit --retain-splash
 	fi
 
 EOF
@@ -586,15 +592,8 @@ if [ $plymouth_support == 1 ]; then
 	cat >> $output_dir/init << "EOF"
 	# inform plymouth of new root
 	#
-	#if [ $show_splash == 1 ]; then
-	#	plymouth --newroot=/newroot
-	#fi
-	#plymouth hide-splash
-	#/bin/sh
-	#mv /tmp/plymouth.log /newroot/var/log/plymouth.log
-	plymouth --newroot=/newroot
-	if [ $show_splash == 0 ]; then
-		plymouth hide-splash
+	if [ $show_splash == 1 ]; then
+		plymouth --newroot=/newroot
 	fi
 
 EOF
