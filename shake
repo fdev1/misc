@@ -1,7 +1,65 @@
-#!/bin/sh
+#!/bin/bash
 
+#
+# Runs shake on the directories listed in
+# /etc/shake.d/autoshake_dirs at a set interval.
+# It only runs shake on one of the directories every
+# time, if for some reason it doesn't complete it will
+# try to run it on the same directory the next time.
+#
+# This script should be scheduled to run every hour.
+# It requires GNU date and bash
+#
+
+# The shake interval in days
+#
+interval=7
+
+# The hours, in 24 hour format, when it's OK
+# to shake it
+#
+shake_hours="20 21 22 23 0 1 2"
+
+################################################################
+
+# get today's date in seconds since epoch
+#
+today=$(/bin/date +%s)
+
+# make sure .current_dir exists
+#
 if [ ! -f /etc/shake.d/.current_dir ]; then
 	touch /etc/shake.d/.current_dir
+fi
+
+# make sure it's a good time to shake it
+#
+shake_hour_ok=0
+current_hour=$(/bin/date +%H)
+for h in $shake_hours; do
+	if [ "$h" == "$current_hour" ]; then
+		shake_hour_ok=1
+	fi
+done
+if [ $shake_hour_ok == 0 ]; then
+	echo "Not a good time to shake it!"
+	exit 0
+fi
+
+# if last_shake does not exist initialize it to 
+# exactly interval ago
+#
+if [ ! -f /etc/shake.d/last_shake ]; then
+	echo $((today - (60 * 60 * 24 * interval))) > /etc/shake.d/last_shake
+fi
+
+# if it's not shake time yet then exit
+#
+last_shake=$(cat /etc/shake.d/last_shake)
+next_shake=$((last_shake + (60 * 60 * 24 * interval)))
+if [ $today -lt $next_shake ]; then
+	echo "I won't shake it again in the next $(((next_shake - today) / (60 * 60 * 24))) days."
+	exit 0
 fi
 
 next=1
@@ -58,5 +116,5 @@ done
 echo "Shaking ${current_dir}..."
 /usr/bin/nice -n 19 /usr/bin/shake $current_dir
 echo $next_dir > /etc/shake.d/.current_dir
-echo $(/bin/date) > /etc/shake.d/last_shake
+echo $(/bin/date +%s) > /etc/shake.d/last_shake
 
