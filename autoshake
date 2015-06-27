@@ -26,6 +26,10 @@ shake_hours="20 21 22 23 0 1 2"
 #
 today=$(/bin/date +%s)
 
+if [ -f /etc/shake.d/autoshake.conf ]; then
+	source /etc/shake.d/autoshake.conf
+fi
+
 # make sure .current_dir exists
 #
 if [ ! -f /etc/shake.d/.current_dir ]; then
