@@ -1,0 +1,52 @@
+#!/bin/bash
+#
+# Unison sync script
+# ==================
+#
+# This script can be used to sync a directory within your
+# home directory with the same directory on anoother host. To
+# use it copy the script to a directory in your search PATH 
+# (ie. /usr/local/bin), the create a symlink in the form
+# HOST-sync to it and another symlink in the form DIRECTORY-sync.
+# For example, to sync ~/Music with ~/Music on host 10.10.0.1 
+# do this:
+#
+# /usr/local/bin/unison-sync
+# /usr/local/bin/10.10.0.1-sync -> unison-sync
+# /usr/local/bin/Music-sync -> 10.10.0.1-sync
+#
+# The symlinks and the script need not be in the same directory.
+#
+
+SYNCDIR=${0%%-sync}
+SYNCDIR=$(basename $SYNCDIR)
+
+SYNCHOST=$(readlink $0)
+
+if [ "$SYNCHOST" == "" ]; then
+	echo "This script cannot be called directly!"
+	echo "Please create a symlink in the form HOSTNAME-sync"
+	exit -1
+elif [ "$SYNCHOST" == "unison-sync" ]; then
+	echo "This script must be double symlinked."
+	echo "In order to sync with a directory in host $SYNCDIR you must create another"
+	echo "symlink to $0 in the form DIRNAME-sync"
+fi
+
+SYNCHOST=${SYNCHOST%%-sync}
+SYNCHOST=$(basename $SYNCHOST)
+
+echo "Host: "$SYNCHOST
+echo "Directory: "$SYNCDIR
+echo "Attempting sync..."
+
+# run sync
+#
+unison 	-ui text \
+	-auto \
+	-perms 0 \
+	-fat \
+	-unicode utf8 \
+	~/$SYNCDIR \
+	ssh://$SYNCHOST/$SYNCDIR
+
