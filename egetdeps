@@ -1,0 +1,12 @@
+#!/bin/sh
+#
+# egetdeps - Gets the portage package dependencies
+# of an executable file in a format suitable for
+# ebuild dependencies
+#
+
+echo "Calculating dependencies..."
+
+for pkg in $(equery belongs `ldd $1 | grep "=>" | cut -d ">" -f2 | cut -d "(" -f1` | cut -d" " -f1 | sort -u); do
+	echo ">=${pkg%%-r*}"
+done
