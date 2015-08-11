@@ -90,6 +90,7 @@ static char *getip()
 
 int main(void)
 {
+	int r;
 	const char *ip, *cmd;
 	struct stat ssh_bad;
 	ip = getip();
@@ -111,7 +112,7 @@ int main(void)
 		int fd;
 		if ((fd = open(RECENT_LIST_STR, O_WRONLY)) != -1)
 		{
-			write(fd, ip, strlen(ip) + 1);
+			r = write(fd, ip, strlen(ip) + 1);
 			close(fd);
 		}
 	}
@@ -119,7 +120,7 @@ int main(void)
 	/*
 	 * Drop setuid privileges
 	 */
-	setuid(getuid());
+	r = setuid(getuid());
 
 	/*
 	 * if the user is executing a command via ssh then execute the
@@ -127,7 +128,7 @@ int main(void)
 	 */
 	if (cmd && strlen(cmd))
 	{
-		system(cmd);
+		r = system(cmd);
 	}
 	else
 	{
@@ -137,6 +138,6 @@ int main(void)
 		execv(shell, (char * const[]) { (char *const)shell, NULL });
 	}
 
-	return 0;
+	return (r = 0);
 }
 
