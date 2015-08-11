@@ -18,7 +18,7 @@
  * *******************************************
  *
  * This is a small program that is executed when an ssh session
- * start by specifying as the ForceCommand option on sshd_config.
+ * start by specifying it as the ForceCommand option on sshd_config.
  *
  * It removes the client ip from the xt_recent list specified at 
  * compile time and then executes the ssh command specified by the
@@ -50,12 +50,21 @@
 #define RECENT_LIST DEFAULT
 #endif
 
+#ifndef DEFAULT_SHELL
+#define DEFAULT_SHELL "/bin/bash"
+#endif
+
 #define STRINGIZE(x) #x
 #define STRINGIZE_RECENT_LIST(x) STRINGIZE(x)
 #define RECENT_LIST_STR "/proc/net/xt_recent/"STRINGIZE_RECENT_LIST(RECENT_LIST)
 
 /*
- * Get the IP of the ssh client.
+ * Get the IP of the ssh client from the SSH_CONNECTION
+ * environment variable. If not set (ie. we're not in an
+ * SSH session) return NULL. Otherwise return the IP 
+ * prepended with a minus sign so it's useful for writing
+ * to /proc/net/xt_recent/<listname> in order to remove
+ * the IP from the blacklist.
  */
 static char *getip()
 {
@@ -64,10 +73,7 @@ static char *getip()
 	static char ip[17];
 	ssh_con = getenv("SSH_CONNECTION");
 	if (!ssh_con)
-	{
-		ip[0] = 0;
 		return NULL;
-	}
 	ip[0] = '-';
 	for (i = 1; i < 16; i++)
 	{
@@ -89,19 +95,24 @@ int main(void)
 	ip = getip();
 	cmd = getenv("SSH_ORIGINAL_COMMAND");
 
+	if (!ip)
+	{
+		printf("This program cannot be executed directly.\n");
+		printf("Please add \"ForceCommand /usr/bin/ssh-cmdexec\" to /etc/sshd_config.\n");
+		printf("This build will remove the client IP from: " RECENT_LIST_STR "\n");
+		return 0;
+	}
+
 	/*
 	 * Remove our ip from the recent list
 	 */
-	if (ip)
+	if (!stat(RECENT_LIST_STR, &ssh_bad))
 	{
-		if (!stat(RECENT_LIST_STR, &ssh_bad))
+		int fd;
+		if ((fd = open(RECENT_LIST_STR, O_WRONLY)) != -1)
 		{
-			int fd;
-			if ((fd = open(RECENT_LIST_STR, O_WRONLY)) != -1)
-			{
-				write(fd, ip, strlen(ip) + 1);
-				close(fd);
-			}
+			write(fd, ip, strlen(ip) + 1);
+			close(fd);
 		}
 	}
 
@@ -123,7 +134,7 @@ int main(void)
 		const char *shell = getenv("SHELL");
 		const char *const args[2] = { shell, NULL };
 		if (!shell)
-			shell = "/bin/bash";
+			shell = DEFAULT_SHELL;
 		execv(shell, (char * const*) args);
 	}
 
