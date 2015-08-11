@@ -89,8 +89,6 @@ int main(void)
 	ip = getip();
 	cmd = getenv("SSH_ORIGINAL_COMMAND");
 
-	printf("PID: %u\n", getpid());
-
 	/*
 	 * Remove our ip from the recent list
 	 */
