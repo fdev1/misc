@@ -132,10 +132,9 @@ int main(void)
 	else
 	{
 		const char *shell = getenv("SHELL");
-		const char *const args[2] = { shell, NULL };
 		if (!shell)
 			shell = DEFAULT_SHELL;
-		execv(shell, (char * const*) args);
+		execv(shell, (char * const[]) { (char *const)shell, NULL });
 	}
 
 	return 0;
