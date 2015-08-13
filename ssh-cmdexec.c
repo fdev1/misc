@@ -135,7 +135,7 @@ int main(void)
 		const char *shell = getenv("SHELL");
 		if (!shell)
 			shell = DEFAULT_SHELL;
-		execv(shell, (char * const[]) { (char *const)shell, NULL });
+		execv(shell, (char * const[]) { strdup(shell), NULL });
 	}
 
 	return (r = 0);
