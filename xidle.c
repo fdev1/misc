@@ -1,6 +1,6 @@
 #include <stdio.h>
 #include <X11/extensions/scrnsaver.h>
-
+#include <test.h>
 
 int main() 
 {
