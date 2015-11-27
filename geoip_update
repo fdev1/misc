@@ -1,0 +1,29 @@
+#!/bin/sh
+
+# cron job to update GeoIP database
+
+cleanup()
+{
+	rm -fr /var/tmp/GeoIP/*
+}
+
+die()
+{
+	echo "$0"
+	cleanup
+	exit 1
+}
+
+mkdir -p /var/tmp/GeoIP || exit 1
+
+wget http://geolite.maxmind.com/download/geoip/database/GeoLiteCountry/GeoIP.dat.gz -O - | \
+	gunzip > /var/tmp/GeoIP/GeoIP.dat && \
+	mv /var/tmp/GeoIP/GeoIP.dat /usr/share/GeoIP/GeoIP.dat || \
+	die "Could not update GeoIP.dat"
+
+wget http://geolite.maxmind.com/download/geoip/database/GeoLiteCity.dat.gz -O - | \
+	gunzip > /var/tmp/GeoIP/GeoCity.dat && \
+	mv /var/tmp/GeoIP/GeoCity.dat /usr/share/GeoIP/GeoCity.dat || \
+	die "Could not update GeoCity.dat"
+
+cleanup
