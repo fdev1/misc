@@ -1,0 +1,8 @@
+// Allow only root to modify NetworkManager system settings
+// By default plugdev is allowed, we don't want that.
+polkit.addRule(function(action, subject) {
+    if (action.id == "org.freedesktop.NetworkManager.settings.modify.system" &&
+        !subject.isInGroup("root") && subject.active) {
+        return "auth_admin";
+    }
+});
