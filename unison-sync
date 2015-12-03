@@ -45,7 +45,6 @@ echo "Attempting sync..."
 unison 	-ui text \
 	-auto \
 	-perms 0 \
-	-fat \
 	-unicode utf8 \
 	~/$SYNCDIR \
 	ssh://$SYNCHOST/$SYNCDIR
