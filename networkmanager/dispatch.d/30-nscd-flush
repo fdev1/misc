@@ -1,0 +1,7 @@
+#!/bin/sh
+
+# restart the name service caching daemon to flush DNS
+# we do this for both up and down events as there could be
+# more than one connection
+logger -t "nm-dispatch-script[$$]" "Restarting Name Service Caching Daemon"
+systemctl restart nscd

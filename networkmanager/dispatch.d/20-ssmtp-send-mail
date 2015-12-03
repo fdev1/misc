@@ -3,11 +3,11 @@
 # Attempt to send queued emails as soon as
 # a connection is made.
 if [ "$2" == "up" ]; then
-	/usr/bin/logger -t "20-ssmtp-send-mail[$$]" "Sending mail upon connection"
+	/usr/bin/logger -t "nm-dispatch-script[$$]" "Sending mail upon connection"
 	/usr/sbin/ssmtp -q
 	for user in $(/bin/cut -d: -f1 /etc/passwd); do
 		if [ -e "/home/${user}/.ssmtprc" ]; then
-			/usr/bin/logger -t "20-ssmtp-send-mail[$$]" "Sending mail for user ${user}"
+			/usr/bin/logger -t "nm-dispatch-script[$$]" "Sending mail for user ${user}"
 			/bin/su "${user}" -c "/usr/sbin/ssmtp -q"
 		fi
 	done
