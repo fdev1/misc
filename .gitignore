@@ -5,4 +5,4 @@ mkinitramfs.bak
 *.save
 *.save.*
 config.bak
-
+ssh-cmdexec
