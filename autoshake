@@ -1,11 +1,9 @@
 #!/bin/bash
 
 #
-# Runs shake on the directories listed in
-# /etc/shake.d/autoshake_dirs at a set interval.
-# It only runs shake on one of the directories every
-# time, if for some reason it doesn't complete it will
-# try to run it on the same directory the next time.
+# Runs shake on the directories listed in $shake_dirs at a the
+# interval specified by $interval (in days). Everytime this script
+# runs it # will "shake" one of the directories on the list.
 #
 # This script should be scheduled to run every hour.
 # It requires GNU date and bash
@@ -18,11 +16,17 @@ interval=7
 # to shake it
 shake_hours="20 21 22 23 0 1 2"
 
+# the list of directories to shake
+shake_dirs="/var /home"
+
 # enable logging to syslog/journal
 enable_logging=1
 
 # enable debugging output to log
 debug=1
+
+# the data directory path
+DATAPATH=/var/db/autosake
 
 ################################################################
 
@@ -42,13 +46,29 @@ debug "Running autoshake"
 today=$(/bin/date +%s)
 
 # source config file if it exists
-if [ -f /etc/shake.d/autoshake.conf ]; then
-	source /etc/shake.d/autoshake.conf
+if [ -f /etc/autoshake.conf ]; then
+	source /etc/autoshake.conf
 fi
 
-# make sure .current_dir exists
-if [ ! -f /etc/shake.d/.current_dir ]; then
-	touch /etc/shake.d/.current_dir
+# make sure data directory exists
+if [ ! -d "${DATAPATH}" ]; then
+	mkdir -p "${DATAPATH}"
+fi
+
+# make sure that the lock file exists
+if [ ! -f "${DATAPATH}/lock" ]; then
+	echo 0 > "${DATAPATH}/lock"
+fi
+
+# make sure current_dir file exists
+if [ ! -f "${DATAPATH}/current_dir" ]; then
+	touch "${DATAPATH}/current_dir"
+fi
+
+# if last_shake does not exist initialize it to 
+# exactly interval ago
+if [ ! -f "${DATAPATH}/last_shake" ]; then
+	echo $((today - (60 * 60 * 24 * interval))) > "${DATAPATH}/last_shake"
 fi
 
 # make sure it's a good time to shake it
@@ -64,28 +84,32 @@ if [ $shake_hour_ok == 0 ]; then
 	exit 0
 fi
 
-# if last_shake does not exist initialize it to 
-# exactly interval ago
-if [ ! -f /etc/shake.d/last_shake ]; then
-	echo $((today - (60 * 60 * 24 * interval))) > /etc/shake.d/last_shake
-fi
-
 # if it's not shake time yet then exit
-last_shake=$(cat /etc/shake.d/last_shake)
+last_shake=$(cat "${DATAPATH}/last_shake")
 next_shake=$((last_shake + (60 * 60 * 24 * interval)))
 if [ $today -lt $next_shake ]; then
 	debug "Next shake due in $(((next_shake - today) / (60 * 60 * 24))). Exiting"
 	exit 0
 fi
 
+# if we're already  running then exit, otherwise
+# set the lock. This is good enough if this script is only
+# executed by the hourly cron job
+if [ "$(cat "${DATAPATH}/lock")" == "1" ]; then
+	debug "Autoshake locked (is it already running?)"
+	exit 1
+else
+	echo "1" > "${DATAPATH}/lock"
+fi
+
 next=1
 next_dir=
-current_dir=$(cat /etc/shake.d/.current_dir)
+current_dir=$(cat "${DATAPATH}/current_dir")
 
 # set next_dir to the first directory on the list
 # and if current_dir is not initialized then initialize
 # it to the first entry on the list
-for d in $(cat /etc/shake.d/autoshake_dirs); do
+for d in ${shake_dirs}; do
 	if [ "$current_dir" == "" ]; then
 		current_dir=$d
 	fi
@@ -95,7 +119,7 @@ done
 
 # if the current_dir is not on the list then set
 # it to the first item on the list
-for d in $(cat /etc/shake.d/autoshake_dirs); do
+for d in ${shake_dirs}; do
 	if [ "$current_dir" == "$d" ]; then
 		next=0
 	fi
@@ -107,7 +131,7 @@ fi
 
 # find the next directory on the list. If we reach the end of
 # list or if the current directory was removed from the list
-for d in $(cat /etc/shake.d/autoshake_dirs); do	
+for d in ${shake_dirs}; do	
 	if [ "$d" == "$current_dir" ]; then
 		next=1
 	elif [ $next == 1 ]; then
@@ -121,9 +145,9 @@ log "Begin shaking ${current_dir}"
 /usr/bin/nice -n 19 /usr/bin/shake $current_dir
 log "Completed shaking ${current_dir} (next dir: ${next_dir})"
 
-# save $next_diir to /etc/shake.d/.current_dir and
-# the current date (in seconds since epoch) to
-# /etc/shake.d/last_shake
-echo $next_dir > /etc/shake.d/.current_dir
-echo $(/bin/date +%s) > /etc/shake.d/last_shake
+# save $next_diir to current_dir and the current date (in seconds
+# since unix epoch) to last_shake
+echo $next_dir > "${DATAPATH}/current_dir"
+echo $(/bin/date +%s) > "${DATAPATH}/last_shake"
+echo "0" > "${DATAPATH}/lock"
 
