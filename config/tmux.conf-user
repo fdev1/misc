@@ -1,0 +1,3 @@
+bind y run-shell "tmux show-buffer | xclip -sel clip -i" \;
+bind C-k send-keys "clear"\; send-keys "Enter"\; clear-history
+
