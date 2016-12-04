@@ -210,9 +210,9 @@ if [ $plymouth_support == 1 ]; then
 	cp /sbin/plymouthd $output_dir/sbin/plymouthd || last_error=1
 	cp -r /etc/plymouth/* $output_dir/etc/plymouth || last_error=1
 
-	cp /usr/lib/libply.so.2 $output_dir/usr/lib
-	cp /usr/lib/libply-splash-core.so.2 $output_dir/usr/lib
-	cp /usr/lib/libply-splash-graphics.so.2 $output_dir/usr/lib
+	cp /usr/lib/libply.so.4 $output_dir/usr/lib
+	cp /usr/lib/libply-splash-core.so.4 $output_dir/usr/lib
+	cp /usr/lib/libply-splash-graphics.so.4 $output_dir/usr/lib
 	cp /usr/lib/libpng16.so.16 $output_dir/usr/lib
 	cp /usr/lib/libkms.so.1 $output_dir/usr/lib
 	cp /usr/lib/libdrm.so.2 $output_dir/usr/lib
