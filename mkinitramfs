@@ -213,6 +213,7 @@ if [ $plymouth_support == 1 ]; then
 	cp /usr/lib/libply.so.4 $output_dir/usr/lib
 	cp /usr/lib/libply-splash-core.so.4 $output_dir/usr/lib
 	cp /usr/lib/libply-splash-graphics.so.4 $output_dir/usr/lib
+	cp /usr/lib/libudev.so.1 $output_dir/usr/lib
 	cp /usr/lib/libpng16.so.16 $output_dir/usr/lib
 	cp /usr/lib/libkms.so.1 $output_dir/usr/lib
 	cp /usr/lib/libdrm.so.2 $output_dir/usr/lib
