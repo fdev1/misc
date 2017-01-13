@@ -29,12 +29,14 @@ copy_firmware=0
 copy_modules=0
 #compress=1
 overlay=""
+udev_support=0
 pango_support=1
 plymouth_support=1
 uswsusp_support=0
 swsusp_support=1
 compress_method="gzip"
-drm="amdgpu"
+debug=0
+drm="intel fglrx"
 
 # error checking routine
 #
@@ -63,7 +65,9 @@ while [ $# != 0 ];
 do
 
 	case $1 in
-
+		--debug)
+			debug=1
+		;;
 		--copy-firmware)
 			copy_firmware=1
 		;;
@@ -87,6 +91,7 @@ do
 			plymouth_support=0
 		;;
 		--disable-swsusp)
+
 			swsusp_support=0
 		;;
 		--disable-uswsusp)
@@ -144,6 +149,8 @@ mkdir -p $output_dir/sys || last_error=1
 mkdir -p $output_dir/run || last_error=1
 mkdir -p $output_dir/var || last_error=1
 mkdir -p $output_dir/var/log || last_error=1
+mkdir -p $output_dir/var/run || last_error=1
+mkdir -p $output_dir/var/lib || last_error=1
 mkdir -p $output_dir/tmp || last_error=1
 mkdir -p $output_dir/newroot || last_error=1
 mkdir -p $output_dir/newroot/run
@@ -157,6 +164,8 @@ mknod -m 660 $output_dir/dev/zero c 1 5 || last_error=1
 mknod -m 600 $output_dir/dev/tty0 c 4 0 || last_error=1
 mknod -m 600 $output_dir/dev/tty1 c 4 1 || last_error=1
 mknod -m 600 $output_dir/dev/ttyS0 c 4 64 || last_error=1
+mknod -m 600 $output_dir/dev/urandom c 1 9 || last_error=1
+mknod -m 600 $output_dir/dev/random c 1 8 || last_error=1
 chmod 1777 $output_dir/dev/shm || last_error=1
 error_check
 
@@ -187,6 +196,44 @@ ln -s busybox $output_dir/bin/mv || last_error=1
 ln -s busybox $output_dir/bin/touch || last_error=1
 ln -s /bin/busybox $output_dir/sbin/switch_root || last_error=1
 
+# If debug is set then copy some stuff that we may
+# need for debugging
+#
+if [ $debug -eq 1 ]; then
+	display_msg 'Copying debug utilities...'
+	ln -s /bin/busybox ${output_dir}/sbin/kill
+	ln -s /bin/busybox ${output_dir}/sbin/killall
+	ln -s /bin/busybox ${output_dir}/bin/tee
+	cp /usr/bin/strace ${output_dir}/bin
+	cp /usr/bin/ldd ${output_dir}/bin || last_error=1
+	cp /root/traceit ${output_dir}/bin 
+
+	# ldd has /bin/bash shebang, but works with
+	# busybox's sh, at least for our purposes
+	echo -e '#!/bin/sh\nexec /bin/sh' > $output_dir/bin/bash
+	chmod 666 $output_dir/bin/bash
+fi
+
+# udev
+#
+if [ $udev_support == 1 ]; then
+	display_msg "Copying udev..."
+	udevadm_trigger_args=""
+	if [ $debug == 1 ]; then
+		udevadm_trigger_args="-v"
+	fi
+	mkdir -p ${output_dir}/usr/lib/systemd
+	mkdir -p ${output_dir}/etc/udev
+	mkdir -p ${output_dir}/lib/systemd
+	mkdir -p ${output_dir}/run/udev/data
+	mkdir -p ${output_dir}/run/udev/queue
+	cp /usr/lib/systemd/systemd-udevd ${output_dir}/usr/lib/systemd
+	cp /usr/bin/udevadm ${output_dir}/usr/bin
+	cp -a /etc/udev ${output_dir}/etc
+	cp -a /usr/lib/systemd ${output_dir}/usr/lib
+fi
+
+
 # If we're copying modules to the init image then
 # we need kmod
 #
@@ -206,6 +253,8 @@ if [ $plymouth_support == 1 ]; then
 	mkdir -p $output_dir/etc/plymouth || last_error=1
 	mkdir -p $output_dir/usr/share/plymouth/themes || last_error=1
 	mkdir -p $output_dir/usr/lib/plymouth/renderers || last_error=1
+	mkdir -p $output_dir/var/lib/plymouth || last_error=1
+	mkdir -p $output_dir/var/run/plymouth || last_error=1
 	cp /bin/plymouth $output_dir/bin/plymouth || last_error=1
 	cp /sbin/plymouthd $output_dir/sbin/plymouthd || last_error=1
 	cp -r /etc/plymouth/* $output_dir/etc/plymouth || last_error=1
@@ -213,10 +262,15 @@ if [ $plymouth_support == 1 ]; then
 	cp /usr/lib/libply.so.4 $output_dir/usr/lib
 	cp /usr/lib/libply-splash-core.so.4 $output_dir/usr/lib
 	cp /usr/lib/libply-splash-graphics.so.4 $output_dir/usr/lib
+	cp /usr/lib/libply.so.2 $output_dir/usr/lib
+	cp /usr/lib/libply-splash-core.so.2 $output_dir/usr/lib
+	cp /usr/lib/libply-splash-graphics.so.2 $output_dir/usr/lib
 	cp /usr/lib/libudev.so.1 $output_dir/usr/lib
 	cp /usr/lib/libpng16.so.16 $output_dir/usr/lib
-	cp /usr/lib/libkms.so.1 $output_dir/usr/lib
-	cp /usr/lib/libdrm.so.2 $output_dir/usr/lib
+	if [ "$drm" != "" ]; then
+		cp /usr/lib/libkms.so.1 $output_dir/usr/lib
+		cp /usr/lib/libdrm.so.2 $output_dir/usr/lib
+	fi
 	cp /lib/libc.so.6 $output_dir/lib
 	cp /lib/librt.so.1 $output_dir/lib
 	cp /lib/libdl.so.2 $output_dir/lib
@@ -229,6 +283,7 @@ if [ $plymouth_support == 1 ]; then
 	cp /lib/libuuid.so.1 $output_dir/lib
 	cp /lib/libblkid.so.1 $output_dir/lib
 	cp /lib/libattr.so.1 $output_dir/lib
+	cp /lib/libcap.so.2 $output_dir/lib
 	cp /usr/lib/plymouth/text.so $output_dir/usr/lib/plymouth
 	cp /usr/lib/plymouth/label.so $output_dir/usr/lib/plymouth
 	cp /usr/lib/plymouth/details.so $output_dir/usr/lib/plymouth
@@ -328,10 +383,12 @@ fi
 if [ $copy_firmware == 1 ]; then
 	display_msg 'Copying USB firmware...'
 	mkdir -p $output_dir/lib/firmware || last_error=1
-	cp -r /lib/firmware/ar3k $output_dir/lib/firmware/ || last_error=1
+#	cp -r /lib/firmware/ar3k $output_dir/lib/firmware/ || last_error=1
+#	error_check
+#	cp -r /lib/firmware/amdgpu $output_dir/lib/firmware/ 
+#	cp -r /lib/firmware/radeon $output_dir/lib/firmware/ 
+	cp -r /lib/firmware $output_dir/lib/firmware || last_error=1
 	error_check
-	cp -r /lib/firmware/amdgpu $output_dir/lib/firmware/ 
-	cp -r /lib/firmware/radeon $output_dir/lib/firmware/ 
 fi	
 
 for driver in $drm; 
@@ -370,6 +427,12 @@ do
 			if [ $plymouth_support == 1 ]; then
 				display_msg 'Copy libdrm_radeon.so...'
 				cp /usr/lib/libdrm_radeon.so.1 $output_dir/usr/lib
+			fi
+		;;
+		intel)
+			if [ $plymouth_support == 1 ]; then
+				display_msg 'Copy libdrm_intel.so...'
+				cp /usr/lib/libdrm_intel.so.1 $output_dir/usr/lib
 			fi
 		;;
 	esac
@@ -412,6 +475,8 @@ cat > $output_dir/init << "EOF"
 # initramfs init script
 #
 
+logfile=/initramfs.log
+
 # error checking routine
 #
 error_check()
@@ -425,46 +490,85 @@ error_check()
 	fi
 }
 
+log()
+{
+	echo "${1}" >> /initramfs.log
+}
+
 EOF
+
+# debug print function
+if [ $debug -eq 1 ]; then
+	cat >> ${output_dir}/init << "EOF"
+	debug_print()
+	{
+		echo "${1}"
+	}
+EOF
+
+else
+	cat >> ${output_dir}/init << "EOF"
+	debug_print()
+	{
+		echo "" > /dev/null
+	}
+EOF
+fi
 
 if [ $plymouth_support == 1 ]; then
 
-	cat >> $output_dir/init << "EOF"
-	plymouth_start()
-	{
-		if [ $show_splash == 1 ]; then
-			plymouthd --mode=shutdown --kernel-command-line="splash"
-		fi
-	}
+	if [ $debug == 1 ]; then
+			cat >> $output_dir/init << "EOF"
+			plymouth_start()
+			{
+				if [ $show_splash == 1 ]; then
+					strace -ff -e trace=file /sbin/plymouthd --mode=shutdown --debug --debug-file=/plymouth.log --kernel-command-line=splash 2>&1 | tee /plymouth-trace.txt > /dev/null &
+				#plymouth --debug
+			fi
+		}
+EOF
+	else
+		cat >> $output_dir/init << "EOF"
+		plymouth_start()
+		{
+			if [ $show_splash == 1 ]; then
+				plymouthd --mode=shutdown --debug --debug-file=/plymouth.log --kernel-command-line="splash plymouth:debug" 2>> ${logfile}
+				#plymouth --debug
+			fi
+		}
+EOF
+	fi
 
+	cat >> $output_dir/init << "EOF"
 	plymouth_show()
 	{
 		if [ $show_splash == 1 ]; then
-			plymouth show-splash
+			plymouth show-splash 2>> ${logfile}
 		fi
 	}
 
 	plymouth_set_message()
 	{
-		plymouth update --status=msg
-		plymouth update --status="$1"
+		plymouth update --status=msg 2>> ${logfile}
+		plymouth update --status="$1" 2>> ${logfile}
 	}
 
 	plymouth_set_quiet()
 	{
 		if [ $quiet == 1 ]; then
-			plymouth update --status=set-quiet
+			plymouth update --status=set-quiet 2>> ${logfile}
 		fi
 	}
 
 	plymouth_set_boot_mode()
 	{
-		plymouth change-mode --boot-up
-		plymouth update --status=show-progress
+		plymouth change-mode --boot-up 2>> ${logfile}
+		plymouth update --status=show-progress 2>> ${logfile}
 	}
 
 EOF
 fi
+display_msg "Done"
 
 cat >> $output_dir/init << "EOF"
 # clean input/output
@@ -473,7 +577,7 @@ exec >/dev/console </dev/console 2>&1
 
 # make sure that /sbin and /usr/sbin are in PATH
 #
-PATH="${PATH}:/sbin:/usr/sbin"
+PATH="${PATH}:/sbin:/usr/sbin:/usr/bin"
 
 fake_root=""
 quiet=0
@@ -484,12 +588,19 @@ init_opts=""
 uswsusp=0
 swsusp_resume=""
 
+
+debug_print "Making initrd writeable..."
+mount -o remount,rw / >/dev/null 2>&1
+log "Initial RAM filesystem loaded"
+
+
 # mount virtual filesystems
 #
-mount -t proc -o noexec,nosuid,nodev proc /proc >/dev/null 2>&1
-mount -o remount,rw / >/dev/null 2>&1
-mount -t tmpfs -o rw,nosuid,nodev,relatime,mode=755 none /run 2>&1
-mount -t tmpfs -o rw,nosuid,nodev,relatime,mode=755 none /dev/shm 2>&1
+debug_print "Mounting virtual filesystems..."
+mount -t proc -o noexec,nosuid,nodev proc /proc >/dev/null 2>> ${logfile}
+mount -t tmpfs -o rw,nosuid,nodev,relatime,mode=755 none /run 2>> ${logfile}
+mount -t tmpfs -o rw,nosuid,nodev,relatime,mode=755 none /dev/shm 2>> ${logfile}
+
 
 # mount devfs
 #
@@ -504,11 +615,23 @@ error_check
 #
 mount -t sysfs sysfs /sys -o noexec,nosuid,nodev > /dev/null 2>&1 || last_error=1
 error_check
+EOF
 
-#/bin/sh
+if [ $udev_support == 1 ]; then
+	cat >> $output_dir/init << "EOF"
+	debug_print "Launching udev"
+	#export SYSTEMD_LOG_TARGET=console
+	/usr/lib/systemd/systemd-udevd --daemon --resolve-names=never 2>&1 > /dev/null
+	debug_print "udevadm trigger..."
+	/usr/bin/udevadm trigger ${udevadm_trigger_args}
+	debug_print "udevadm settle..."
+	/usr/bin/udevadm settle
+EOF
+fi
 
 # parse command line
 #
+cat >> $output_dir/init << "EOF"
 for x in $(cat /proc/cmdline); do
 	case "${x}" in
         	root=*)
@@ -539,12 +662,20 @@ done
 
 EOF
 
+if [ $debug -eq 17 ]; then
+	cat >> ${output_dir}/init << "EOF"
+	debug_print "Launching debug shell..."
+	/bin/sh
+EOF
+fi
+
 if [ $uswsusp_support == 1 ]; then
 
 	cat >> $output_dir/init << "EOF"
 	# invoke uswsusp resume
 	#
 	if [ $uswsusp == 1 ]; then
+		debug_print "Attempting uswsusp resume..."
 		/sbin/resume &
 		resume_pid=$!
 		sleep 0.5
@@ -567,6 +698,7 @@ if [ $plymouth_support == 1 ]; then
 
 	# start plymouthd and show splash screen
 	#
+	debug_print "Starting splash screen..."
 	plymouth_start
 	plymouth_show
 	plymouth_set_quiet
@@ -583,9 +715,12 @@ if [ $swsusp_support == 1 ] && [ $plymouth_support == 1 ]; then
 	# Resume using swsusp
 	#
 	if [ "$swsusp_resume" != "" ]; then
-		plymouth_set_message "Thawing System..."
-		sleep 0.25
-		echo "$swsusp_resume" > /sys/power/resume
+		if [ -f /sys/power/resume ]; then
+			debug_print "Attempting swsusp resume from ${swsusp_resume}..."
+			plymouth_set_message "Thawing System..."
+			sleep 0.25
+			echo "$swsusp_resume" > /sys/power/resume
+		fi
 		plymouth_set_boot_mode
 		plymouth_set_quiet
 		plymouth_set_message "Booting System..."
@@ -602,7 +737,10 @@ elif [ $swsusp_support == 1 ]; then
 	# Resume using swsusp
 	#
 	if [ "$swsusp_resume" != "" ]; then
-		echo "$swsusp_resume" > /sys/power/resume
+		if [ -f /sys/power/resume ]; then
+			debug_print "Attempting swsusp from ${swsusp_resume}..."
+			echo "$swsusp_resume" > /sys/power/resume
+		fi
 	fi
 
 EOF
@@ -628,7 +766,17 @@ fi
 cat >> $output_dir/init << "EOF"
 # mount the new root filesystem
 #
-mount -o ro $fake_root /newroot
+mount -t ext4 -o rw $fake_root /newroot
+log "${fake_root} mounted"
+if [ -f /initramfs.log ]; then
+	cp /initramfs.log /newroot
+fi
+if [ -f /plymouth-trace.txt ]; then
+	cp /plymouth-trace.txt /newroot
+fi
+plymouth update-root-fs --new-root-dir=/newroot
+#plymouth update-root-fs --read-write
+mount -o remount,ro /newroot
 
 # move virtual filesystems to new root
 #
